@@ -5,14 +5,9 @@ import torch.optim as optim
 import torch.backends.cudnn as cudnn
 import sentencepiece as spm
 
-import models.base as base
-import models.recurrent as recurrent
-import models.evolved as evolved
-
 from modules.data import load_dataloader
 from modules.train import Trainer
 from modules.test import Tester
-from modules.inference import Translator
 
 
 
@@ -26,53 +21,13 @@ def set_seed(SEED=42):
     cudnn.deterministic = True
 
 
-def load_tokenizer(lang):
+def load_tokenizer():
     tokenizer = spm.SentencePieceProcessor()
-    tokenizer.load(f'data/{lang}_spm.model')
+    tokenizer.load(f'data/spm.model')
     tokenizer.SetEncodeExtraOptions('bos:eos')    
     return tokenizer    
 
 
-def init_weights(m):
-    if hasattr(m, 'weight') and m.weight.dim() > 1:
-        nn.init.xavier_uniform_(m.weight.data)    
-
-
-def count_params(model):
-    params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    print(f"model params: {params:,}")
-
-
-def check_size(model):
-    param_size, buffer_size = 0, 0
-
-    for param in model.parameters():
-        param_size += param.nelement() * param.element_size()
-    
-    for buffer in model.buffers():
-        buffer_size += buffer.nelement() * buffer.element_size()
-
-    size_all_mb = (param_size + buffer_size) / 1024**2
-    print('model size: {:.3f}MB'.format(size_all_mb))
-
-
-def load_model(config):
-    if config.model_name == 'base':
-        model = base.Transformer(config).to(config.device)
-    elif config.model_name == 'recurrent':
-        model = recurrent.Transformer(config).to(config.device)
-    elif config.model_name == 'evolved':
-        model = evolved.Transformer(config).to(config.device)     
-
-
-    if config.task == 'train':
-        model.apply(init_weights)
-    else:
-        model_state = torch.load(config.ckpt_path, map_location=config.device)['model_state_dict']
-        model.load_state_dict(model_state)
-        model.eval()
-
-    return model
 
 
 class Config:
@@ -103,20 +58,20 @@ class Config:
             print(f"* {attr}: {val}")
 
 
-def main(config):
+def main(args):
+    set_seed()
+    config = Config(args)
+
     return
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
-    parser.add_argument('-task', required=True)
+    parser.add_argument('-mode', required=True)
     parser.add_argument('-model', required=True)
-    parser.add_argument('-scheduler', default='constant', required=False)
     
     args = parser.parse_args()
-    assert args.task in ['train', 'test', 'inference']
-    assert args.model in ['seq2seq', 'attention', 'transformer']
+    assert args.mode in ['train', 'test', 'inference']
+    assert args.model in ['original', 'recurrent', 'evolved']
     
-    set_seed()
-    config = Config(args)
-    main(config)
+    main(args)
