@@ -10,11 +10,9 @@ class Dataset(torch.utils.data.Dataset):
         self.data = self.load_data(split)
 
     @staticmethod
-    def load_data(task, split):
+    def load_data(split):
         with open(f"data/{split}.json", 'r') as f:
             data = json.load(f)
-        if split=='train':
-            return data[::3]
         return data
 
     def __len__(self):
@@ -31,7 +29,7 @@ def load_dataloader(config, split):
     global pad_id
     pad_id = config.pad_id    
 
-    def base_collate(batch):
+    def collate_fn(batch):
         src_batch, trg_batch = [], []
         
         for src, trg in batch:
@@ -51,8 +49,8 @@ def load_dataloader(config, split):
                 'label': trg_batch[1:]}
 
 
-    return DataLoader(Dataset(config.task, split), 
+    return DataLoader(Dataset(split), 
                       batch_size=config.batch_size, 
                       shuffle=True,
-                      collate_fn=base_collate,
+                      collate_fn=collate_fn,
                       num_workers=2)

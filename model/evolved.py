@@ -2,6 +2,7 @@ import copy, torch
 import torch.nn as nn
 import torch.nn.init as init
 from torch.nn import functional as F
+from model.common import PositionalEncoding
 
 #This is swift act func for decoder
 #torch.nn.SiLU
@@ -169,33 +170,12 @@ class EvolvedTransformer(nn.Module):
         self.decoder = Decoder(config)
 
 
-    def forward(self, x):
-        return out
-
-
-
-class BaseModel(nn.Module):
-    def __init__(self, config):
-        super(BaseModel, self).__init__()
-        
-        self.device = config.device
-        self.pad_id = config.pad_id
-
-        self.encoder = Encoder(config)
-        self.decoder = Decoder(config)
-        self.fc_out = nn.Linear(config.hidden_dim, config.vocab_size)
-
     def pad_mask(self, x):
-        return (x != self.pad_id).unsqueeze(1).unsqueeze(2)
+        return
 
     def dec_mask(self, x):
-        seq_len = x.size(-1)
-        attn_shape = (1, seq_len, seq_len)
-        subsequent_mask = torch.triu(torch.ones(attn_shape), diagonal=1).type(torch.uint8) == 0
-        return self.pad_mask(x) & subsequent_mask.to(self.device)
+        return 
 
-    def forward(self, src, trg):
-        e_mask, d_mask = self.pad_mask(src), self.dec_mask(trg)
-        memory = self.encoder(src, e_mask)
-        dec_out = self.decoder(trg, memory, e_mask, d_mask)
-        return self.fc_out(dec_out)        
+
+    def forward(self, x):
+        return out

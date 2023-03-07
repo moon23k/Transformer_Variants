@@ -1,13 +1,13 @@
 import random, torch, yaml, argparse
 import numpy as np
 import torch.nn as nn
-import torch.optim as optim
 import torch.backends.cudnn as cudnn
 import sentencepiece as spm
 
-from modules.data import load_dataloader
-from modules.train import Trainer
-from modules.test import Tester
+from module.model import load_model
+from module.data import load_dataloader
+from module.train import Trainer
+from module.test import Tester
 
 
 
@@ -29,33 +29,32 @@ def load_tokenizer():
 
 
 
+class Config(object):
+    def __init__(self, args):    
 
-class Config:
-    def __init__(self, task, model_name):
-        with open('configs/model.yaml', 'r') as f:
-            params = yaml.load(f, Loader=yaml.FullLoader)        
-            for p in params.items():
-                setattr(self, p[0], p[1])
-        
-        self.task = task
-        self.model_name = model_name
+        with open('config.yaml', 'r') as f:
+            params = yaml.load(f, Loader=yaml.FullLoader)
+            for group in params.keys():
+                for key, val in params[group].items():
+                    setattr(self, key, val)
 
-        self.unk_idx = 0
-        self.pad_idx = 1
-        self.bos_idx = 2
-        self.eos_idx = 3
-        
-        self.clip = 1
-        self.n_epochs = 10
-        self.batch_size = 128
-        self.learning_rate = 5e-4
-        self.scheduler = 'constant'
-        self.ckpt_path = f'ckpt/{model_name}.pt'
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    
+        self.mode = args.mode
+        self.model_type = args.model
+        self.max_pred_len = self.max_pred_len
+        self.ckpt = f"ckpt/{self.model_type}.pt"
+
+        use_cuda = torch.cuda.is_available()
+        self.device_type = 'cuda' if use_cuda else 'cpu'
+        self.device = torch.device(self.device_type)
+
+        if self.mode == 'inference':
+            self.search_method = args.search
+            self.device = torch.device('cpu')
+
     def print_attr(self):
-        for attr, val in self.__dict__.items():
-            print(f"* {attr}: {val}")
+        for attribute, value in self.__dict__.items():
+            print(f"* {attribute}: {value}")
+
 
 
 def main(args):
