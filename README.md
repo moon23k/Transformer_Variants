@@ -1,8 +1,7 @@
 ## Transformer_Ablation
 
-Transformer is being used as a basis for various NLP models.
-This repo focuses only on Transformer itself, comparing each Design Choices.
-
+The Transformer is a great model, but it's a not perfect model. There's still plenty of room for improvement in Transformer.
+This repo compares the three structures, each of **Vanilla**, **Recurrent**, and **Evolved** Transformer. A detailed description of each structure is given below.
 
 <br>
 <br>
@@ -11,9 +10,13 @@ This repo focuses only on Transformer itself, comparing each Design Choices.
 
 **Vanilla Transformer**
 
+
+
 <br>
 
-**Sliced Recurrent Transformer**
+**Recurrent Transformer**
+
+
 
 <br>
 
@@ -29,5 +32,30 @@ This repo focuses only on Transformer itself, comparing each Design Choices.
 <br>
 
 ## Result
+
+<br>
+<br>
+
+## How to Use
+
+```
+git clone https://github.com/moon23k/Transformer_Arhcs.git
+```
+
+```
+python3 setup.py
+```
+
+```
+python3 run.py -mode ['train', 'test', 'inference'] -model ['vanilla', 'recurrent', 'evolved']
+```
+
+<br>
+<br>
+
+## Reference
+* [**Attention Is All You Need**](https://arxiv.org/abs/1706.03762) <br>
+* [**Universal Transformers**](https://arxiv.org/abs/1807.03819) <br>
+* [**The Evolved Transformer**](https://arxiv.org/abs/1901.11117)
 
 <br>
