@@ -1,6 +1,7 @@
 import numpy as np
 import torch, math
 import torch.nn as nn
+from collections import namedtuple
 from model.common import PositionalEncoding
 
 
@@ -64,6 +65,7 @@ class RecurrentTransformer(nn.Module):
         
         self.pad_id = config.pad_id
         self.device = config.device
+        self.vocab_size = config.vocab_size
 
         self.enc_emb = nn.Sequential([nn.Embeddings(config.vocab_size, config.emb_dim),
                                       nn.Linear(config.emb_dim, config.hidden_dim)])
@@ -91,7 +93,8 @@ class RecurrentTransformer(nn.Module):
         dec_out = self.decode(trg_emb, memory, trg_mask, src_pad_mask, trg_pad_mask)
         
         self.out.logit = self.generator(dec_out)
-        self.out.loss = self.criterion(logit, label)
+        self.out.loss = self.criterion(logit.contiguous().view(-1, self.vocab_size), 
+                                       label.contiguous().view(-1))
         
         return self.out
 

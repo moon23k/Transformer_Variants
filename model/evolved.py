@@ -2,8 +2,8 @@ import copy, torch
 import torch.nn as nn
 import torch.nn.init as init
 from torch.nn import functional as F
-from model.common import PositionalEncoding
-
+from collections import namedtuple
+from model.common import Embeddings
 #This is swift act func for decoder
 #torch.nn.SiLU
 
@@ -140,9 +140,9 @@ class Encoder(nn.Module):
         self.cells = clone(EncoderCell, config.num_cells)
 
 
-    def forward(self, x):
+    def forward(self, src, x_mask):
         for cell in self.cells:
-            x = cell(x)
+            x = cell(x, x_mask)
         return out
 
 
@@ -156,7 +156,7 @@ class Decoder(nn.Module):
         self.cells = clone(DecoderCell, config.num_cells)
 
 
-    def forward(self, x):
+    def forward(self, x, memory, x_mask, memory_mask):
         for cell in self.cells:
             x = cell(x)
         return out
@@ -165,17 +165,35 @@ class Decoder(nn.Module):
 class EvolvedTransformer(nn.Module):
     def __init__(self, config):
         super(EvolvedTransformer, self).__init__()
-
+        
+        self.device = config.device
+        self.vocab_size = config.vocab_size
+        
         self.encoder = Encoder(config) 
         self.decoder = Decoder(config)
+        self.generator = nn.Linear(config.hidden_dim, config.vocab_size)
+        self.criterion = nn.CrossEntropyLoss()
+        self.out = namedtuple('Out', 'logit loss')
 
 
-    def pad_mask(self, x):
-        return
+    def forward(self, src, trg, label):
+        src_pad_mask = (src == self.pad_id)
+        trg_pad_mask = (trg == self.pad_id)
+        trg_mask = self.transformer.generate_square_subsequent_mask(trg.size(1))
 
-    def dec_mask(self, x):
-        return 
+        memory = self.encode(src_emb, src_pad_mask)
+        dec_out = self.decode(trg_emb, memory, trg_mask, src_pad_mask, trg_pad_mask)
+        logit = self.generator(dec_out)
+        
+        self.out.logit = logit
+        self.out.loss = self.criterion(logit.contiguous().view(-1, self.vocab_size), 
+                                       label.contiguous().view(-1))
+
+        return self.out
 
 
-    def forward(self, x):
-        return out
+    def encode(self, src, src_pad_mask):
+        return self.encoder(src, src_pad_mask)
+
+    def decode(self, trg, memory, trg_pad_mask, trg_mask, memory_mask):
+        return self.decoder(trg, memory, trg_pad_mask, trg_mask, memory_mask)

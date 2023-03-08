@@ -1,16 +1,18 @@
 import torch, math
 import torch.nn as nn
+from collections import namedtuple
 from model.common import Embeddings
 
 
 
 
-class OriginalTransformer(nn.Module):
+class VanillaTransformer(nn.Module):
     def __init__(self, config):
-        super(OriginalTransformer, self).__init__()
+        super(VanillaTransformer, self).__init__()
         
         self.pad_id = config.pad_id
         self.device = config.device
+        self.vocab_size = config.vocab_size
 
         self.enc_emb = Embeddings(config.vocab_size, config.hidden_dim)
         self.dec_emb = Embeddings(config.vocab_size, config.hidden_dim)
@@ -37,9 +39,11 @@ class OriginalTransformer(nn.Module):
 
         memory = self.encode(src_emb, src_pad_mask)
         dec_out = self.decode(trg_emb, memory, trg_mask, src_pad_mask, trg_pad_mask)
+        logit = self.generator(dec_out)
         
-        self.out.logit = self.generator(dec_out)
-        self.out.loss = self.criterion(logit, label)
+        self.out.logit = logit
+        self.out.loss = self.criterion(logit.contiguous().view(-1, self.vocab_size), 
+                                       label.contiguous().view(-1))
         
         return self.out
 

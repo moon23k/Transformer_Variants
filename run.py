@@ -57,11 +57,50 @@ class Config(object):
 
 
 
+def inference(config, model, tokenizer):
+    search_module = Search(config, model, tokenizer)
+
+    print(f'--- Inference Process Started! ---')
+    print('[ Type "quit" on user input to stop the Process ]')
+    
+    while True:
+        input_seq = input('\nUser Input Sequence >> ').lower()
+
+        #Enc Condition
+        if input_seq == 'quit':
+            print('\n--- Inference Process has terminated! ---')
+            break        
+
+        if config.search_method == 'beam':
+            output_seq = search_module.beam_search(input_seq)
+        else:
+            output_seq = search_module.greedy_search(input_seq)
+
+        print(f"Model Out Sequence >> {output_seq}")       
+
+
+
+
 def main(args):
     set_seed()
     config = Config(args)
+    model = load_model(config)
 
-    return
+    if config.mode == 'train':
+        train_datalaoder = load_dataloader(config, 'train')
+        valid_datalaoder = load_dataloader(config, 'valid')
+        trainer = Trainer(config, model, train_dataloader, valid_dataloader)
+        trainer.train()
+    elif config.mode == 'test':
+        tokenizer = load_tokenizer()
+        test_dataloader = load_dataloader(config, 'test')
+        tester = Tester(config, model, tokenizer, test_dataloader)
+        tester.test()
+    elif config.mode == 'inference':
+        tokenizer = load_tokenizer()
+        inference(config, model, tokenizer)
+
+
 
 
 if __name__ == '__main__':
@@ -71,6 +110,6 @@ if __name__ == '__main__':
     
     args = parser.parse_args()
     assert args.mode in ['train', 'test', 'inference']
-    assert args.model in ['original', 'recurrent', 'evolved']
+    assert args.model in ['vanilla', 'recurrent', 'evolved']
     
     main(args)
