@@ -120,7 +120,7 @@ class Trainer:
             for _, batch in enumerate(self.valid_dataloader):
                 src = batch['src'].to(self.device)
                 trg = batch['trg'].to(self.device)
-                labels = batch['label'].to(self.device)
+                label = batch['label'].to(self.device)
                 
                 loss = self.model(src, trg, label).loss
                 epoch_loss += loss.item()

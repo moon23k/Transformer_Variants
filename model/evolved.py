@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.init as init
 from torch.nn import functional as F
 from collections import namedtuple
-from model.common import Embeddings
+from model.common import Embeddings, generate_square_subsequent_mask
 #This is swift act func for decoder
 #torch.nn.SiLU
 
@@ -59,7 +59,77 @@ class EncoderCell(nn.Module):
         self.pad_id = config.pad_id
         self.glu = GatedConvolution(config.hidden_dim)
         self.dropout = nn.Dropout(config.dropout_ratio)
-        self.attention = nn.MultiHeadAttention(config.hidden_dim, config.num_heads)
+        self.attention = nn.MultiheadAttention(config.hidden_dim, config.n_heads, batch_first=True)
+
+        self.mid_layer_norm = nn.LayerNorm(config.pff_dim)
+        self.layer_norms = nn.ModuleList([nn.LayerNorm(config.hidden_dim) for _ in range(4)])        
+
+        self.left_net = nn.Sequential(nn.Linear(config.hidden_dim, config.pff_dim),
+                                      nn.ReLU(),
+                                      nn.Dropout(config.dropout_ratio))
+
+        self.right_net = nn.Sequential(nn.Conv1d(in_channels=config.hidden_dim, 
+                                                 out_channels=config.hidden_dim//2, 
+                                                 kernel_size=3, padding=1),
+                                       nn.ReLU(),
+                                       nn.Dropout(config.dropout_ratio))
+
+        self.sep_conv = SeparableConv1D(config.pff_dim, config.hidden_dim // 2, 9)
+
+        self.pff = nn.Sequential(nn.Linear(config.hidden_dim, config.pff_dim),
+                                 nn.ReLU(),
+                                 nn.Linear(config.pff_dim, config.hidden_dim))
+
+
+    def forward(self, src, src_pad_mask):
+        ### Block_01
+        B01_out = self.glu(self.layer_norms[0](src)) #Dim:512
+
+
+        ### Block_02
+        B02_normed = self.layer_norms[1](B01_out)        
+
+        left_out = self.left_net(B02_normed)
+        right_out = self.right_net(B02_normed.transpose(1, 2)).transpose(1, 2)
+
+        right_out = F.pad(input=right_out, 
+                          pad=(0, left_out.size(-1) - right_out.size(-1), 0,0,0,0), 
+                          mode='constant', value=self.pad_id) #Dim:2048          
+
+        B02_out = left_out + right_out
+
+
+        ### Block_03
+        B03_out = self.mid_layer_norm(B02_out)
+        B03_out = self.sep_conv(B03_out.transpose(1, 2)).transpose(1, 2) #Dim:256
+        B03_out = F.pad(input=B03_out,
+                        pad=(0, B01_out.size(-1) - B03_out.size(-1), 0, 0, 0, 0),
+                        mode='constant', value=self.pad_id)
+        B03_out += B01_out #Dim:512
+
+
+        ### Block_04
+        B04_out = self.layer_norms[2](B03_out)
+        attention_out = self.attention(B04_out, B04_out, B04_out,
+                                       key_padding_mask = src_pad_mask,
+                                       need_weights=False)[0]
+        B04_out += attention_out #Dim:512
+
+
+        ### Block_05 & 06
+        out = self.layer_norms[3](B04_out)
+        out = self.pff(out) + B04_out #Dim:512
+        return out 
+
+
+class DecoderCell(nn.Module):
+    def __init__(self, config):
+        super(DecoderCell, self).__init__()
+        
+        self.pad_id = config.pad_id
+        self.dropout = nn.Dropout(config.dropout_ratio)
+
+        self.attention = nn.MultiheadAttention(config.hidden_dim, config.n_heads)
 
         self.mid_layer_norm = nn.LayerNorm(config.pff_dim)
         self.layer_norms = nn.ModuleList([nn.LayerNorm(config.hidden_dim) for _ in range(4)])        
@@ -77,83 +147,41 @@ class EncoderCell(nn.Module):
                                  nn.ReLU(),
                                  nn.Linear(config.pff_dim, config.hidden_dim))
 
-
     def forward(self, x):
         ### Block_01
-        B01_out = self.glu(self.layer_norms[0](x))
-
-
         ### Block_02
-        B02_normed = self.layer_norms[1](B01_out)        
-
-        left_out = self.left_branch(B02_normed)
-        left_out = self.dropout(left_out)
-
-        right_out = self.right_branch(B02_normed.transpose(1, 2)).transpose(1, 2)
-        right_out = F.pad(input=right_branch, 
-                          pad=(0, left_out.shape[2] - right_out.shape[2], 0,0,0,0), 
-                          mode='constant', value=self.pad_id)
-        right_branch = self.dropout(right_branch)
-        
-        B02_out = left_branch_out + right_branch_out
-
-
         ### Block_03
-        B03_out = self.mid_layer_norm(B02_out)
-        B03_out = self.sep_conv(B03_out.transpose(1, 2)).transpose(1, 2)
-
-        B03_out = F.pad(input=B03_out,
-                        pad=(0, B01_out.shape[2] - B03_out.shape[2], 0, 0, 0, 0),
-                        mode='constant', value=self.pad_id)
-        B03_out += B01_out
-
-
         ### Block_04
-        B04_out = self.layer_norms[2](B03_out).transpose(0, 1)
-        attention_out = self.attention(B04_out, B04_out, B04_out, need_weight=False)[0].transpose(0, 1)
-        B04_out += attention_out
-
-
-        ### Block_05 & 06
-        out = self.layer_norms[3](B04_out)
-        out = self.pff(out) + B04_out
-
-        return out 
-
-
-class DecoderCell(nn.Module):
-    def __init__(self, config):
-        super(DecoderCell, self).__init__()
-
-
-    def forward(self, x):
+        ### Block_05
+        ### Block_06
+        ### Block_07
+        ### Block_08
         return out
 
 
 
-class Encoder(nn.Module):
+class EvolvedEncoder(nn.Module):
     def __init__(self, config):
-        super(Encoder, self).__init__()
+        super(EvolvedEncoder, self).__init__()
 
-        self.emb = Embeddings()
-        #config에서 if model_type == 'evolved' config.num_cells = num_layers // 2
-        self.cells = clone(EncoderCell, config.num_cells)
+        self.emb = Embeddings(config)
+        self.cells = clones(EncoderCell(config), config.n_layers//2)
 
 
-    def forward(self, src, x_mask):
+    def forward(self, src, src_pad_mask):
+        x, x_mask = src, src_pad_mask
         for cell in self.cells:
             x = cell(x, x_mask)
-        return out
+        return x
 
 
 
-class Decoder(nn.Module):
+class EvolvedDecoder(nn.Module):
     def __init__(self, config):
-        super(Decoder, self).__init__()
+        super(EvolvedDecoder, self).__init__()
 
-        self.emb = Embeddings()
-        #config에서 if model_type == 'evolved' config.num_cells = num_layers // 2
-        self.cells = clone(DecoderCell, config.num_cells)
+        self.emb = Embeddings(config)
+        self.cells = clones(DecoderCell(config), config.n_layers//2)
 
 
     def forward(self, x, memory, x_mask, memory_mask):
@@ -166,11 +194,15 @@ class EvolvedTransformer(nn.Module):
     def __init__(self, config):
         super(EvolvedTransformer, self).__init__()
         
+        self.pad_id = config.pad_id
         self.device = config.device
         self.vocab_size = config.vocab_size
-        
-        self.encoder = Encoder(config) 
-        self.decoder = Decoder(config)
+
+        self.enc_emb = Embeddings(config)
+        self.dec_emb = Embeddings(config)
+
+        self.encoder = EvolvedEncoder(config) 
+        self.decoder = EvolvedDecoder(config)
         self.generator = nn.Linear(config.hidden_dim, config.vocab_size)
         self.criterion = nn.CrossEntropyLoss()
         self.out = namedtuple('Out', 'logit loss')
@@ -179,7 +211,10 @@ class EvolvedTransformer(nn.Module):
     def forward(self, src, trg, label):
         src_pad_mask = (src == self.pad_id)
         trg_pad_mask = (trg == self.pad_id)
-        trg_mask = self.transformer.generate_square_subsequent_mask(trg.size(1))
+        trg_mask = generate_square_subsequent_mask(trg.size(1))
+
+        src_emb = self.enc_emb(src)
+        trg_emb = self.dec_emb(trg)
 
         memory = self.encode(src_emb, src_pad_mask)
         dec_out = self.decode(trg_emb, memory, trg_mask, src_pad_mask, trg_pad_mask)

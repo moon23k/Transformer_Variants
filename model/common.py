@@ -3,6 +3,9 @@ import torch.nn as nn
 
 
 
+def generate_square_subsequent_mask(sz):
+    return torch.triu(torch.full((sz, sz), float('-inf')), diagonal=1)
+
 
 class PositionalEncoding(nn.Module):
     def __init__(self, config, max_len=512):

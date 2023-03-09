@@ -24,5 +24,6 @@ model:
 train:
     clip: 1
     n_epochs: 10
-    batch_size: 8
+    batch_size: 128
     learning_rate: 0.001
+    iters_to_accumulate: 4

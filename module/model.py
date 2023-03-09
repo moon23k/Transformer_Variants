@@ -1,6 +1,6 @@
 import os, torch
 import torch.nn as nn
-from model.original import VanillaTransformer
+from model.valilla import VanillaTransformer
 from model.recurrent import RecurrentTransformer
 from model.evolved import EvolvedTransformer
 
@@ -31,11 +31,11 @@ def check_size(model):
 
 
 def load_model(config):
-    if config.model == 'vanilla':
+    if config.model_type == 'vanilla':
         model = VanillaTransformer(config)
-    elif config.model == 'recurrent':
+    elif config.model_type == 'recurrent':
         model = RecurrentTransformer(config)
-    elif config.model == 'evolved':
+    elif config.model_type == 'evolved':
         model = EvolvedTransformer(config)
 
     model.apply(init_xavier)

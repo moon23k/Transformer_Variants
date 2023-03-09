@@ -1,7 +1,7 @@
 import torch, math
 import torch.nn as nn
 from collections import namedtuple
-from model.common import Embeddings
+from model.common import Embeddings, generate_square_subsequent_mask
 
 
 
@@ -14,15 +14,17 @@ class VanillaTransformer(nn.Module):
         self.device = config.device
         self.vocab_size = config.vocab_size
 
-        self.enc_emb = Embeddings(config.vocab_size, config.hidden_dim)
-        self.dec_emb = Embeddings(config.vocab_size, config.hidden_dim)
+        self.enc_emb = Embeddings(config)
+        self.dec_emb = Embeddings(config)
         
         self.transformer = nn.Transformer(d_model=config.hidden_dim,
                                           nhead=config.n_heads,
+                                          dim_feedforward=config.pff_dim,
                                           num_encoder_layers=config.n_layers,
                                           num_decoder_layers=config.n_layers,
                                           dropout=config.dropout_ratio,
-                                          batch_first=True)
+                                          batch_first=True,
+                                          norm_first=True)
 
         self.generator = nn.Linear(config.hidden_dim, config.vocab_size)
         self.criterion = nn.CrossEntropyLoss()
@@ -30,15 +32,15 @@ class VanillaTransformer(nn.Module):
 
         
     def forward(self, src, trg, label):
-        src_pad_mask = (src == self.pad_id)
-        trg_pad_mask = (trg == self.pad_id)
-        trg_mask = self.transformer.generate_square_subsequent_mask(trg.size(1))
+        src_pad_mask = (src == self.pad_id).to(self.device)
+        trg_pad_mask = (trg == self.pad_id).to(self.device)
+        trg_mask = generate_square_subsequent_mask(trg.size(1)).to(self.device)
 
         src_emb = self.enc_emb(src)
         trg_emb = self.dec_emb(trg)
 
         memory = self.encode(src_emb, src_pad_mask)
-        dec_out = self.decode(trg_emb, memory, trg_mask, src_pad_mask, trg_pad_mask)
+        dec_out = self.decode(trg_emb, memory, trg_mask, trg_pad_mask, src_pad_mask)
         logit = self.generator(dec_out)
         
         self.out.logit = logit

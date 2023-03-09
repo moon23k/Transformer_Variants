@@ -45,8 +45,8 @@ def load_dataloader(config, split):
                                  padding_value=pad_id)
         
         return {'src': src_batch, 
-                'trg': trg_batch[:-1],
-                'label': trg_batch[1:]}
+                'trg': trg_batch[:, :-1],
+                'label': trg_batch[:, 1:]}
 
 
     return DataLoader(Dataset(split), 
