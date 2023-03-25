@@ -58,11 +58,10 @@ class EncoderCell(nn.Module):
 
         self.pad_id = config.pad_id
         self.glu = GatedConvolution(config.hidden_dim)
-        self.dropout = nn.Dropout(config.dropout_ratio)
         self.attention = nn.MultiheadAttention(config.hidden_dim, config.n_heads, batch_first=True)
 
         self.mid_layer_norm = nn.LayerNorm(config.pff_dim)
-        self.layer_norms = nn.ModuleList([nn.LayerNorm(config.hidden_dim) for _ in range(4)])        
+        self.layer_norms = nn.ModuleList([nn.LayerNorm(config.hidden_dim) for _ in range(4)])
 
         self.left_net = nn.Sequential(nn.Linear(config.hidden_dim, config.pff_dim),
                                       nn.ReLU(),
@@ -131,31 +130,69 @@ class DecoderCell(nn.Module):
 
         self.attention = nn.MultiheadAttention(config.hidden_dim, config.n_heads)
 
-        self.mid_layer_norm = nn.LayerNorm(config.pff_dim)
+        self.mid_layer_norm = nn.LayerNorm(config.hidden_dim * 2)
         self.layer_norms = nn.ModuleList([nn.LayerNorm(config.hidden_dim) for _ in range(4)])        
 
-        self.left_branch = nn.Sequential(nn.Linear(config.hidden_dim, config.pff_dim),
-                                         nn.ReLU())
-        self.right_branch = nn.Sequential(nn.Conv1d(in_channels=config.hidden_dim, 
-                                                    out_channels=config.hidden_dim//2, 
-                                                    kernel_size=3, padding=1),
-                                          nn.ReLU())
 
+        self.left_attn = nn.MultiheadAttention(config.hidden_dim, config.n_heads * 2, batch_first=True)
+        self.right_attn = nn.MultiheadAttention(config.hidden_dim, config.n_heads, batch_first=True)
+
+        self.left_net = nn.Sequential(SeparableConv1D(config.pff_dim, config.hidden_dim // 2, 9), 
+                                      nn.ReLU())
+        
+        self.right_net = SeparableConv1D(config.pff_dim, config.hidden_dim // 2, 9)
+        
         self.sep_conv = SeparableConv1D(config.pff_dim, config.hidden_dim // 2, 9)
+
+
+        self.self_attn = nn.MultiheadAttention(config.hidden_dim, config.n_heads * 2, batch_first=True)
+        self.src_attn = nn.MultiheadAttention(config.hidden_dim, config.n_heads, batch_first=True)
 
         self.pff = nn.Sequential(nn.Linear(config.hidden_dim, config.pff_dim),
                                  nn.ReLU(),
                                  nn.Linear(config.pff_dim, config.hidden_dim))
 
-    def forward(self, x):
+
+    def forward(self, trg, memory, trg_mask, src_pad_mask, trg_pad_mask):
+
         ### Block_01
+        B01_out = self.layer_norms[0](src)
+        B01_out = self.left_attn(B01_out) + self.right_attn(B01_out)
+
+
         ### Block_02
+        B02_out = self.layer_norms[1](B01_out)
+        left_out = self.left_net()
+        right_out = self.right_net()
+
+        right_out = F.pad(input=right_out, 
+                          pad=(0, left_out.size(-1) - right_out.size(-1), 0,0,0,0), 
+                          mode='constant', value=self.pad_id) #Dim:1024          
+        B02_out = left_out + right_out #Dim: 1024
+
+
         ### Block_03
+        B03_out = self.mid_layer_norm(B02_out)
+        B03_out = self.sep_conv(B03_out)
+        B03_out += B01_out
+
+
         ### Block_04
+        B04_out = self.layer_norms[2](B03_out)
+        B04_out = self.self_attn()
+        B04_out += B03_out
+
+
         ### Block_05
-        ### Block_06
-        ### Block_07
-        ### Block_08
+        B05_out = self.layer_norms[3](B04_out)
+        B05_out = self.src_attn()
+        B05_out += B04_out        
+
+
+        ### Block_06 & Block_07
+        out = self.layer_norms[4](B05_out)
+        out = self.pff(out) + B05_out #Dim:512        
+
         return out
 
 
@@ -203,8 +240,10 @@ class EvolvedTransformer(nn.Module):
 
         self.encoder = EvolvedEncoder(config) 
         self.decoder = EvolvedDecoder(config)
+
         self.generator = nn.Linear(config.hidden_dim, config.vocab_size)
         self.criterion = nn.CrossEntropyLoss()
+        
         self.out = namedtuple('Out', 'logit loss')
 
 
