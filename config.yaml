@@ -15,7 +15,7 @@ vocab:
 model:
     emb_dim: 256
     hidden_dim: 512
-    pff_dim: 512
+    pff_dim: 2048
     n_layers: 3
     n_heads: 8
     dropout_ratio: 0.1

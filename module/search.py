@@ -100,8 +100,7 @@ class Search:
         return top_node.pred.squeeze(0)
     
 
-    def greedy_search(self, input_seq):
-        input_tensor = self.process_input(input_seq)
+    def greedy_search(self, input_tensor):
 
         output_seq = [[self.pad_id  if i else self.bos_id for i in range(self.max_len)]]
         output_tensor = torch.LongTensor(output_seq).to(self.device)

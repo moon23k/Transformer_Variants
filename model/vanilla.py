@@ -1,7 +1,7 @@
 import torch, math
 import torch.nn as nn
 from collections import namedtuple
-from model.common import Embeddings, generate_square_subsequent_mask
+from model.common import *
 
 
 
@@ -31,7 +31,9 @@ class VanillaTransformer(nn.Module):
         self.out = namedtuple('Out', 'logit loss')
 
         
-    def forward(self, src, trg, label):
+    def forward(self, src, trg):
+        trg, label = shift_trg(trg)
+
         src_pad_mask = (src == self.pad_id).to(self.device)
         trg_pad_mask = (trg == self.pad_id).to(self.device)
         trg_mask = generate_square_subsequent_mask(trg.size(1)).to(self.device)

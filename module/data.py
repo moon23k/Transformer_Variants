@@ -24,12 +24,11 @@ class Dataset(torch.utils.data.Dataset):
         return src, trg
 
 
+class Collator(object):
+    def __init__(self, config):
+        self.pad_id = config.pad_id
 
-def load_dataloader(config, split):
-    global pad_id
-    pad_id = config.pad_id    
-
-    def collate_fn(batch):
+    def __call__(self, batch):
         src_batch, trg_batch = [], []
         
         for src, trg in batch:
@@ -45,12 +44,13 @@ def load_dataloader(config, split):
                                  padding_value=pad_id)
         
         return {'src': src_batch, 
-                'trg': trg_batch[:, :-1],
-                'label': trg_batch[:, 1:]}
+                'trg': trg_batch}
 
+
+def load_dataloader(config, split):
 
     return DataLoader(Dataset(split), 
                       batch_size=config.batch_size, 
-                      shuffle=True,
-                      collate_fn=collate_fn,
+                      shuffle=True if config.mode == 'train' else False,
+                      collate_fn=Collator(config),
                       num_workers=2)

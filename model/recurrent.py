@@ -2,7 +2,7 @@ import numpy as np
 import torch, math
 import torch.nn as nn
 from collections import namedtuple
-from model.common import generate_square_subsequent_mask
+from model.common import generate_square_subsequent_mask, shift_trg
 
 
 
@@ -97,7 +97,9 @@ class RecurrentTransformer(nn.Module):
         self.out = namedtuple('Out', 'logit loss')
 
         
-    def forward(self, src, trg, label):
+    def forward(self, src, trg):
+        trg, label = shift_trg(trg)
+        
         src_pad_mask = (src == self.pad_id)
         trg_pad_mask = (trg == self.pad_id)
         trg_mask = generate_square_subsequent_mask(trg.size(1)).to(self.device)

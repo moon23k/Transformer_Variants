@@ -40,3 +40,7 @@ class Embeddings(nn.Module):
         out = self.tok_emb(x) * self.scale
         out = self.pos_emb(out)
         return self.fc(out)
+
+
+def shift_trg(x):
+    return x[:, :-1], x[:, 1:]

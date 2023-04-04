@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.init as init
 from torch.nn import functional as F
 from collections import namedtuple
-from model.common import Embeddings, generate_square_subsequent_mask
+from model.common import *
 #This is swift act func for decoder
 #torch.nn.SiLU
 
@@ -247,7 +247,9 @@ class EvolvedTransformer(nn.Module):
         self.out = namedtuple('Out', 'logit loss')
 
 
-    def forward(self, src, trg, label):
+    def forward(self, src, trg):
+        trg, label = shift_trg(trg)
+
         src_pad_mask = (src == self.pad_id)
         trg_pad_mask = (trg == self.pad_id)
         trg_mask = generate_square_subsequent_mask(trg.size(1))
