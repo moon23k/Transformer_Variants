@@ -1,5 +1,6 @@
 import torch, operator
 import torch.nn.functional as F
+from itertools import groupby
 from queue import PriorityQueue
 from collections import namedtuple
 
@@ -21,17 +22,16 @@ class Search:
         self.Node = namedtuple('Node', ['prev_node', 'pred', 'log_prob', 'length'])
 
 
-    def get_score(self, node, min_length=5, alpha=1.2):            
-        repeat_penalty = 1
-        pred = node.pred.tolist()
-        
-        for idx in range(len(pred) - self.max_repeat):
-            exceed = len(set(pred[idx: idx + self.max_repeat])) == 1
-            if exceed and pred[idx] != self.pad_id:
-                repeat_penalty = -1
-                break
-        
+    def get_score(self, node, max_repeat=5, min_length=5, alpha=1.2): 
+        if not node.log_prob:
+            return node.log_prob
+
+        #find max number of consecutively repeated tokens
+        repeat = max([sum(1 for token in group if token != self.pad_id) for _, group in groupby(node.pred.tolist())])
+
+        repeat_penalty = 0.5 if repeat > max_repeat else 1
         len_penalty = ((node.length + min_length) / (1 + min_length)) ** alpha
+        
         score = node.log_prob / len_penalty
         score = score * repeat_penalty
         return score
