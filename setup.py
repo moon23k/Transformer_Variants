@@ -1,101 +1,123 @@
-import os, yaml, json
+import os, json, yaml, argparse
 import sentencepiece as spm
 from run import load_tokenizer
+from datasets import load_dataset
 
 
 
-def read_text(f_name):
-    with open(f"{f_name}", 'r') as f:
-        data = f.readlines()
-    return data
+
+def select_data(orig_data, volumn=32000):
+    min_len = 10 
+    max_len = 300
+    max_diff = 50
+
+    volumn_cnt = 0
+    concat, selected = [], []
+    
+    for elem in orig_data:
+        temp_dict = dict()
+        src, trg = elem['en'].lower(), elem['de'].lower()
+        src_len, trg_len = len(src), len(trg)
+
+        #define filtering conditions
+        min_condition = (src_len >= min_len) & (trg_len >= min_len)
+        max_condition = (src_len <= max_len) & (trg_len <= max_len)
+        dif_condition = abs(src_len - trg_len) < max_diff
+
+        if max_condition & min_condition & dif_condition:
+            temp_dict['src'] = src
+            temp_dict['trg'] = trg
+            
+            selected.append(temp_dict)
+            concat.append(src + trg)
+            
+            #End condition
+            volumn_cnt += 1
+            if volumn_cnt == volumn:
+                break
+
+    with open('data/concat.txt', 'w') as f:
+        f.write('\n'.join(concat))
+
+    return selected
 
 
-def save_json(data_obj, split):
-    with open(f"data/{split}.json", 'w') as f:
-        json.dump(data_obj, f)
 
 
-def process_data(f_name):
-    assert os.path.exists(f'data/{f_name}')
-    with open(f"data/{f_name}", 'r') as f:
-        data = f.readlines()
-    #sort by lenth and do lower_case
-    lowered = [seq.lower() for seq in sorted(data)]
-    with open(f"data/{f_name}", 'w') as f:
-        f.write(''.join(lowered))
+def build_vocab():
+    assert os.path.exists('config.yaml')
+    with open('config.yaml', 'r') as f:
+        vocab_config = yaml.load(f, Loader=yaml.FullLoader)['vocab']
 
-
-def build_vocab(lang):
-    os.system(f'cat data/*.{lang} >> data/concat.{lang}')
-    assert os.path.exists(f'data/concat.{lang}')
-
-    with open('configs/vocab.yaml', 'r') as f:
-        vocab_dict = yaml.load(f, Loader=yaml.FullLoader)
-
-    opt = f"--input=data/concat.{lang}\
-            --model_prefix=data/{lang}_spm\
-            --vocab_size={vocab_dict['vocab_size']}\
-            --character_coverage={vocab_dict['coverage']}\
-            --model_type={vocab_dict['type']}\
-            --unk_id={vocab_dict['unk_id']} --unk_piece={vocab_dict['unk_piece']}\
-            --pad_id={vocab_dict['pad_id']} --pad_piece={vocab_dict['pad_piece']}\
-            --bos_id={vocab_dict['bos_id']} --bos_piece={vocab_dict['bos_piece']}\
-            --eos_id={vocab_dict['eos_id']} --eos_piece={vocab_dict['eos_piece']}"
+    assert os.path.exists('data/concat.txt')
+    opt = f"--input=data/concat.txt\
+            --model_prefix=data/spm\
+            --vocab_size={vocab_config['vocab_size']}\
+            --character_coverage={vocab_config['coverage']}\
+            --model_type={vocab_config['type']}\
+            --pad_id={vocab_config['pad_id']} --pad_piece={vocab_config['pad_piece']}\
+            --unk_id={vocab_config['unk_id']} --unk_piece={vocab_config['unk_piece']}\
+            --bos_id={vocab_config['bos_id']} --bos_piece={vocab_config['bos_piece']}\
+            --eos_id={vocab_config['eos_id']} --eos_piece={vocab_config['eos_piece']}"
 
     spm.SentencePieceTrainer.Train(opt)
-    os.remove(f'data/concat.{lang}')
+    os.remove(f'data/concat.txt')
 
 
-def tokenize_data(split, src_tokenizer, trg_tokenizer):
-    tokenized = list()
-    src_data = read_text(f"data/{split}.src") 
-    trg_data = read_text(f"data/{split}.trg")
 
-    for src_sent, trg_sent in zip(src_data, trg_data):
+def tokenize_data(tokenizer, data_obj):
+    tokenized, max_trg_len = 0, []
+
+    for elem in data_obj:
         temp_dict = dict()
-        temp_dict['src'] = src_tokenizer.EncodeAsIds(src_sent.strip())
-        temp_dict['trg'] = src_tokenizer.EncodeAsIds(trg_sent.strip())
+        
+        temp_dict['src'] = tokenizer.EncodeAsIds(elem['src'])
+        temp_dict['trg'] = tokenizer.EncodeAsIds(elem['trg'])
+
+        if max_trg_len < len(temp_dict['trg']):
+            max_trg_len = len(temp_dict['trg'])
+
         tokenized.append(temp_dict)
+
+    with open('config.yaml', 'r') as f:
+        config = yaml.load(f, Loader=yaml.FullLoader)
+        config['model']['max_pred_len'] = max_trg_len
+
+    with open('config.yaml', 'w') as f:
+        yaml.dump(config, f)        
     
     return tokenized
 
 
-def main():
-    name_dict = {'train.en': 'train.src',
-                 'train.de': 'train.trg', 
-                 'val.en': 'valid.src',
-                 'val.de': 'valid.trg', 
-                 'test_2016_flickr.en': 'test.src',
-                 'test_2016_flickr.de': 'test.trg'}
-    
-    #download data
-    os.system('bash download_data.sh')
-    
-    #process data
-    for k, v in name_dict.items():
-        assert os.path.exists(f'data/{k}')
-        os.system(f'mv data/{k} data/{v}')
-        process_data(v)
-        assert os.path.exists(f'data/{v}')
+def save_data(data_obj):
+    #split data into train/valid/test sets
+    train, valid, test = data_obj[:-2000], data_obj[-2000:-1000], data_obj[-1000:]
+    data_dict = {k:v for k, v in zip(['train', 'valid', 'test'], [train, valid, test])}
 
-    #build vocab
-    assert os.path.exists('configs/vocab.yaml')
-    build_vocab('src')
-    build_vocab('trg')
+    for key, val in data_dict.items():
+        with open(f'data/{key}.json', 'w') as f:
+            json.dump(val, f)        
+        assert os.path.exists(f'data/{key}.json')
     
-    #load_tokenizers
-    src_tokenizer = load_tokenizer('src')
-    trg_tokenizer = load_tokenizer('trg')
-    
-    #tokenize datasets and save'em
-    for split in ['train', 'valid', 'test']:
-        tokenized_data = tokenize_data(split, src_tokenizer, trg_tokenizer)
-        save_json(tokenized_data, split)
-        os.remove(f"data/{split}.src")
-        os.remove(f"data/{split}.trg")
-        assert os.path.exists(f'data/{split}.json')
 
 
-if __name__ == '__main__':
+def main(task):
+    #Load Original Data
+    orig = load_dataset('wmt14', 'de-en', split='train')['translation']
+
+    #Select Data
+    selected = select_nmt(orig)
+
+    #Build Vocab
+    build_vocab()
+
+    #Tokenize Datasets
+    tokenizer = load_tokenizer()
+    tokenized = tokenize_data(tokenizer, selected)
+
+    #Save Data
+    save_data(tokenized)
+
+
+if __name__ == '__main__':    
     main()
-    

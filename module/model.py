@@ -1,6 +1,6 @@
 import os, torch
 import torch.nn as nn
-from model.valilla import VanillaTransformer
+from model.vanilla import VanillaTransformer
 from model.recurrent import RecurrentTransformer
 from model.evolved import EvolvedTransformer
 
