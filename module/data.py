@@ -37,11 +37,11 @@ class Collator(object):
         
         src_batch = pad_sequence(src_batch,
                                  batch_first=True,
-                                 padding_value=pad_id)
+                                 padding_value=self.pad_id)
         
         trg_batch = pad_sequence(trg_batch, 
                                  batch_first=True, 
-                                 padding_value=pad_id)
+                                 padding_value=self.pad_id)
         
         return {'src': src_batch, 
                 'trg': trg_batch}

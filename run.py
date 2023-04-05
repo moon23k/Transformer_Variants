@@ -6,6 +6,7 @@ import sentencepiece as spm
 
 from module.model import load_model
 from module.data import load_dataloader
+from module.search import Search
 from module.train import Trainer
 from module.test import Tester
 
@@ -87,8 +88,8 @@ def main(args):
     model = load_model(config)
 
     if config.mode == 'train':
-        train_datalaoder = load_dataloader(config, 'train')
-        valid_datalaoder = load_dataloader(config, 'valid')
+        train_dataloader = load_dataloader(config, 'train')
+        valid_dataloader = load_dataloader(config, 'valid')
         trainer = Trainer(config, model, train_dataloader, valid_dataloader)
         trainer.train()
     elif config.mode == 'test':

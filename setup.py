@@ -66,7 +66,7 @@ def build_vocab():
 
 
 def tokenize_data(tokenizer, data_obj):
-    tokenized, max_trg_len = 0, []
+    tokenized, max_trg_len = [], 0
 
     for elem in data_obj:
         temp_dict = dict()
@@ -101,12 +101,12 @@ def save_data(data_obj):
     
 
 
-def main(task):
+def main():
     #Load Original Data
     orig = load_dataset('wmt14', 'de-en', split='train')['translation']
 
     #Select Data
-    selected = select_nmt(orig)
+    selected = select_data(orig)
 
     #Build Vocab
     build_vocab()

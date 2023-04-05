@@ -3,6 +3,10 @@ import torch.nn as nn
 
 
 
+def shift_trg(x):
+    return x[:, :-1], x[:, 1:]
+
+
 def generate_square_subsequent_mask(sz):
     return torch.triu(torch.full((sz, sz), float('-inf')), diagonal=1)
 
@@ -40,7 +44,3 @@ class Embeddings(nn.Module):
         out = self.tok_emb(x) * self.scale
         out = self.pos_emb(out)
         return self.fc(out)
-
-
-def shift_trg(x):
-    return x[:, :-1], x[:, 1:]
