@@ -2,7 +2,8 @@ import numpy as np
 import torch, math
 import torch.nn as nn
 from collections import namedtuple
-from model.common import generate_square_subsequent_mask, shift_trg
+from model.common import (Embeddings, shift_trg, 
+                          generate_square_subsequent_mask)
 
 
 
@@ -24,6 +25,7 @@ class RecurrentEncoder(nn.Module):
     def __init__(self, config):
         super(RecurrentEncoder, self).__init__()    
 
+        self.embeddings = Embeddings(config)
         self.n_layers = config.n_layers
         self.time_signal = generate_signal(512, config.hidden_dim).to(config.device)
         self.pos_signal = generate_signal(config.n_layers, config.hidden_dim).to(config.device)
@@ -34,14 +36,14 @@ class RecurrentEncoder(nn.Module):
                                                 norm_first=True)
 
 
-    def forward(self, src_emb, src_pad_mask):
-        x, x_mask = src_emb, src_pad_mask
+    def forward(self, x, x_pad_mask):
+        x = self.embeddings(x)
         seq_len = x.size(1)
 
         for l in range(self.n_layers):
             x += self.time_signal[:, :seq_len, :]
             x += self.pos_signal[:, l, :].unsqueeze(1).repeat(1, seq_len, 1)
-            x = self.layer(x, src_key_padding_mask=x_mask)
+            x = self.layer(x, src_key_padding_mask=x_pad_mask)
         
         return x
 
@@ -51,6 +53,7 @@ class RecurrentDecoder(nn.Module):
     def __init__(self, config):
         super(RecurrentDecoder, self).__init__()    
 
+        self.embeddings = Embeddings(config)
         self.n_layers = config.n_layers
         self.time_signal = generate_signal(512, config.hidden_dim).to(config.device)
         self.pos_signal = generate_signal(config.n_layers, config.hidden_dim).to(config.device)
@@ -60,8 +63,8 @@ class RecurrentDecoder(nn.Module):
                                                 batch_first=True,
                                                 norm_first=True)
 
-    def forward(self, trg_emb, memory, tgt_mask, tgt_key_padding_mask, memory_key_padding_mask):
-        x, m = trg_emb, memory
+    def forward(self, x, m, tgt_mask, tgt_key_padding_mask, memory_key_padding_mask):
+        x = self.embeddings(x)
         seq_len = x.size(1)
 
         for l in range(self.n_layers):
@@ -82,12 +85,6 @@ class RecurrentTransformer(nn.Module):
         self.pad_id = config.pad_id
         self.device = config.device
         self.vocab_size = config.vocab_size
-
-        self.enc_emb = nn.Sequential(nn.Embedding(config.vocab_size, config.emb_dim),
-                                     nn.Linear(config.emb_dim, config.hidden_dim))
-
-        self.dec_emb = nn.Sequential(nn.Embedding(config.vocab_size, config.emb_dim),
-                                     nn.Linear(config.emb_dim, config.hidden_dim))        
         
         self.encoder = RecurrentEncoder(config)
         self.decoder = RecurrentDecoder(config)
@@ -103,9 +100,6 @@ class RecurrentTransformer(nn.Module):
         src_pad_mask = (src == self.pad_id)
         trg_pad_mask = (trg == self.pad_id)
         trg_mask = generate_square_subsequent_mask(trg.size(1)).to(self.device)
-
-        src_emb = self.enc_emb(src)
-        trg_emb = self.dec_emb(trg)
 
         memory = self.encode(src_emb, src_pad_mask)
         dec_out = self.decode(trg_emb, memory, trg_mask, trg_pad_mask, src_pad_mask)
