@@ -167,7 +167,7 @@ def build_vocab(task):
             --pad_id=0 --pad_piece=[PAD]\
             --unk_id=1 --unk_piece=[UNK]\
             --bos_id=2 --bos_piece=[BOS]\
-            --eos_id=3 --eos_piece=[EOS]"
+            --eos_id=3 --eos_piece=[EOS]".replace(' '*12, '')
 
     spm.SentencePieceTrainer.Train(opt)
     os.remove(f'data/{task}/concat.txt')

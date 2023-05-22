@@ -10,10 +10,11 @@ class Search:
     def __init__(self, config, model):
         super(Search, self).__init__()
         
-        self.beam_size = 4
         self.model = model
         self.device = config.device
-        self.max_len = config.max_len
+
+        self.beam_size = 4
+        self.max_len = 512
 
         self.bos_id = config.bos_id
         self.eos_id = config.eos_id
@@ -102,14 +103,15 @@ class Search:
 
     def greedy_search(self, input_tensor):
 
-        output_seq = [[self.pad_id  if i else self.bos_id for i in range(self.max_len)]]
-        output_tensor = torch.LongTensor(output_seq).to(self.device)
+        output_seq = []
 
-
-        e_mask = self.model.enc_mask(input_tensor)
+        src_pad_mask = input_tensor == self.pad_id
         memory = self.model.encoder(input_tensor, e_mask)        
 
         for i in range(1, self.max_len):
+            trg_pad_mask = input_tensor == self.pad_id
+
+            
             d_mask = self.model.dec_mask(output_tensor)
             out = self.model.decoder(output_tensor, memory, e_mask, d_mask)
             out = self.model.fc_out(out)

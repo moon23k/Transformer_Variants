@@ -5,9 +5,9 @@ from torch.nn.utils.rnn import pad_sequence
 
 
 class Dataset(torch.utils.data.Dataset):
-    def __init__(self, split):
+    def __init__(self, task, split):
         super().__init__()
-        self.task = config.task
+        self.task = task
         self.data = self.load_data(split)
 
     def load_data(self, split):
@@ -48,7 +48,7 @@ class Collator(object):
 
 def load_dataloader(config, split):
 
-    return DataLoader(Dataset(split), 
+    return DataLoader(Dataset(config.task, split), 
                       batch_size=config.batch_size, 
                       shuffle=True if config.mode == 'train' else False,
                       collate_fn=Collator(config.pad_id),
