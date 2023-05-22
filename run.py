@@ -22,9 +22,9 @@ def set_seed(SEED=42):
     cudnn.deterministic = True
 
 
-def load_tokenizer():
+def load_tokenizer(task):
     tokenizer = spm.SentencePieceProcessor()
-    tokenizer.load(f'data/spm.model')
+    tokenizer.load(f'data/{task}_tokenizer.model')
     tokenizer.SetEncodeExtraOptions('bos:eos')    
     return tokenizer    
 
@@ -39,6 +39,7 @@ class Config(object):
                 for key, val in params[group].items():
                     setattr(self, key, val)
 
+        self.task = args.task
         self.mode = args.mode
         self.model_type = args.model
         self.max_pred_len = self.max_pred_len
@@ -92,13 +93,15 @@ def main(args):
         valid_dataloader = load_dataloader(config, 'valid')
         trainer = Trainer(config, model, train_dataloader, valid_dataloader)
         trainer.train()
-    elif config.mode == 'test':
-        tokenizer = load_tokenizer()
+        return
+    
+    tokenizer = load_tokenizer(config.task)
+
+    if config.mode == 'test':
         test_dataloader = load_dataloader(config, 'test')
         tester = Tester(config, model, tokenizer, test_dataloader)
         tester.test()
     elif config.mode == 'inference':
-        tokenizer = load_tokenizer()
         inference(config, model, tokenizer)
 
 
@@ -106,6 +109,7 @@ def main(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
+    parser.add_argument('-task', required=True)
     parser.add_argument('-mode', required=True)
     parser.add_argument('-model', required=True)
     

@@ -30,9 +30,8 @@ class Trainer:
 
         self.ckpt = config.ckpt
         self.record_path = f"ckpt/{config.model_type}.json"
-        self.record_keys = ['epoch', 'train_loss', 'train_ppl',
-                            'valid_loss', 'valid_ppl', 
-                            'learning_rate', 'train_time']
+        self.record_keys = ['epoch', 'train_loss', 'train_ppl', 'valid_loss', 
+                            'valid_ppl', 'learning_rate', 'train_time']
 
 
     def print_epoch(self, record_dict):
