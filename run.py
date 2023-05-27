@@ -16,6 +16,7 @@ from module.search import Search
 
 
 
+
 class Config(object):
     def __init__(self, args):    
 
@@ -24,14 +25,21 @@ class Config(object):
         self.model_type = args.model
         self.ckpt = f"ckpt/{self.task}/{self.model_type}.pt"
 
+
         #Training Configs
         self.n_epochs = 10
-        self.batch_size = 128
         self.lr = 1e-4
         self.clip = 1
         self.early_stop = True
         self.patience = 3
         self.iters_to_accumulate = 4
+
+        self.batch_size = 128
+        if self.mode == 'test':
+            self.batch_size = 1
+        if self.task == 'sum':
+            self.batch_size = 64
+
 
         #Model Configs
         self.emb_dim = 256
@@ -46,9 +54,11 @@ class Config(object):
             self.search_method = args.search
             self.device = torch.device('cpu')
 
+
     def print_attr(self):
         for attribute, value in self.__dict__.items():
             print(f"* {attribute}: {value}")
+
 
 
 
@@ -60,6 +70,7 @@ def set_seed(SEED=42):
     torch.cuda.manual_seed_all(SEED)
     cudnn.benchmark = False
     cudnn.deterministic = True
+
 
 
 def load_tokenizer(task):
@@ -84,10 +95,15 @@ def inference(config, model, tokenizer):
             print('\n--- Inference Process has terminated! ---')
             break        
 
+        input_seq = tokenizer.EncodeAsIds(input_seq)
+        input_seq = torch.LongTensor([input_seq])
+
         if config.search_method == 'beam':
             output_seq = search_module.beam_search(input_seq)
         else:
             output_seq = search_module.greedy_search(input_seq)
+
+        output_seq = tokneizer.decode(output_seq)
 
         print(f"Model Out Sequence >> {output_seq}")       
 
@@ -100,18 +116,23 @@ def main(args):
 
     tokenizer = load_tokenizer(config.task)
     setattr(config, 'pad_id', tokenizer.pad_id())
+    setattr(config, 'eos_id', tokenizer.pad_id())
+    setattr(config, 'bos_id', tokenizer.pad_id())
     setattr(config, 'vocab_size', tokenizer.vocab_size())
     model = load_model(config)
+
 
     if config.mode == 'train':
         train_dataloader = load_dataloader(config, 'train')
         valid_dataloader = load_dataloader(config, 'valid')
         trainer = Trainer(config, model, train_dataloader, valid_dataloader)
         trainer.train()
+
     elif config.mode == 'test':
         test_dataloader = load_dataloader(config, 'test')
         tester = Tester(config, model, tokenizer, test_dataloader)
         tester.test()
+
     elif config.mode == 'inference':
         inference(config, model, tokenizer)
 

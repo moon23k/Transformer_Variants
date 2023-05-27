@@ -21,6 +21,10 @@ class Dataset(torch.utils.data.Dataset):
     def __getitem__(self, idx):
         src = self.data[idx]['src']
         trg = self.data[idx]['trg']
+
+        if self.task == 'sum' and len(src) > 512:
+            src = src[:512]
+            
         return src, trg
 
 

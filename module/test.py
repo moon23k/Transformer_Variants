@@ -1,4 +1,4 @@
-import torch, math, time, evaluate
+import json, math, time, torch, evaluate
 from tqdm import tqdm
 from module.search import Search
 from transformers import BertModel, BertTokenizerFast
@@ -6,7 +6,7 @@ from transformers import BertModel, BertTokenizerFast
 
 
 class Tester:
-    def __init__(self, config, model, test_dataloader, tokenizer):
+    def __init__(self, config, model, tokenizer, test_dataloader):
         super(Tester, self).__init__()
         
         self.model = model
@@ -15,7 +15,7 @@ class Tester:
         self.device = config.device
         self.dataloader = test_dataloader
         self.search = Search(config, self.model)
-        
+
         if self.task == 'nmt':
             self.metric_name = 'BLEU'
             self.metric_module = evaluate.load('bleu')
@@ -34,16 +34,16 @@ class Tester:
 
     def test(self):
         self.model.eval()
-        tot_len, greedy_score, beam_score = 0, 0, 0
+        greedy_score, beam_score = 0, 0
+        tot_data_len = len(self.dataloader)
+        
+        print(f'Test Results on {self.task.upper()}')
 
         with torch.no_grad():
-
-            print(f'Test Results on {self.task.upper()}')
             for batch in tqdm(self.dataloader):
             
                 src = batch['src'].to(self.device)
                 trg = batch['trg'].to(self.device)
-                tot_len += src.size(0)
         
                 greedy_pred = self.search.greedy_search(src)
                 beam_pred = self.search.beam_search(src)
@@ -51,8 +51,8 @@ class Tester:
                 greedy_score += self.metric_score(greedy_pred, trg)
                 beam_score += self.metric_score(beam_pred, trg)
         
-        greedy_score = round(greedy_score/tot_len, 2)
-        beam_score = round(beam_score/tot_len, 2)
+        greedy_score = round(greedy_score/tot_data_len, 2)
+        beam_score = round(beam_score/tot_data_len, 2)
         
         return greedy_score, beam_score
         

@@ -11,10 +11,10 @@ class Search:
         super(Search, self).__init__()
         
         self.model = model
-        self.device = config.device
+        self.device = model.device
 
-        self.beam_size = 4
         self.max_len = 512
+        self.beam_size = 4
 
         self.bos_id = config.bos_id
         self.eos_id = config.eos_id
@@ -38,15 +38,15 @@ class Search:
         return score
 
 
-    def get_nodes(self):
+    def get_nodes(self, batch_size):
         Node = self.Node
         nodes = PriorityQueue()
-        start_tensor = torch.LongTensor([[self.bos_id]]).to(self.device)
+        start_tensor = torch.zeros((batch_size, 1), dtype=torch.long).fill_(self.bos_id).to(self.device)
 
-        start_node = Node(prev_node = None,
+        start_node = Node(prev_node = [None for _ in range(batch_size)],
                           pred = start_tensor,
-                          log_prob = 0.0,
-                          length = 0)
+                          log_prob = [0.0 for _ in range(batch_size)],
+                          length = [0 for _ in range(batch_size)])
 
         for _ in range(self.beam_size):
             nodes.put((0, start_node))
@@ -56,10 +56,11 @@ class Search:
 
 
     def beam_search(self, input_tensor):
-        Node, nodes, end_nodes, top_nodes = self.get_nodes()
+        batch_size = input_tensor.size(0)
+        Node, nodes, end_nodes, top_nodes = self.get_nodes(batch_size)
 
-        e_mask = self.model.enc_mask(input_tensor)
-        memory = self.model.encoder(input_tensor, e_mask)        
+        src_pad_mask = self.generate_pad_mask(input_tensor)
+        memory = self.model.encoder(input_tensor, src_key_padding_mask=src_pad_mask)        
 
         for t in range(self.max_len):
             curr_nodes = [nodes.get() for _ in range(self.beam_size)]
@@ -102,24 +103,37 @@ class Search:
     
 
     def greedy_search(self, input_tensor):
+        output_tensor = torch.LongTensor([[self.bos_id]]).to(self.device)
 
-        output_seq = []
+        src_pad_mask = self.generate_pad_mask(input_tensor)
+        src_emb = self.model.enc_emb(input_tensor)
+        memory = self.model.encoder(src_emb, src_key_padding_mask=src_pad_mask)        
 
-        src_pad_mask = input_tensor == self.pad_id
-        memory = self.model.encoder(input_tensor, e_mask)        
-
+        
         for i in range(1, self.max_len):
-            trg_pad_mask = input_tensor == self.pad_id
+            #Masking
+            trg_pad_mask = self.generate_pad_mask(output_tensor)
+            trg_mask = self.generate_square_subsequent_mask(output_tensor.size(1))
 
-            
-            d_mask = self.model.dec_mask(output_tensor)
-            out = self.model.decoder(output_tensor, memory, e_mask, d_mask)
-            out = self.model.fc_out(out)
-            
-            pred = out[:, i].argmax(-1)
-            output_tensor[:, i] = pred
+            #Decoding and Generating
+            dec_emb = self.model.dec_emb(output_tensor)
+            dec_out = self.model.decoder(dec_emb, memory, tgt_mask=trg_mask, 
+                                         tgt_key_padding_mask=trg_pad_mask, 
+                                         memory_key_padding_mask=src_pad_mask)
 
-            if pred.item() == self.eos_id:
+            logit = self.model.generator(dec_out)
+            
+            next_token = logit[:, -1].argmax(-1).view(batch_size, 1)
+            output_tensor = torch.cat([output_tensor, next_token], dim=1)
+
+            if next_token == self.eos_id:
                 break
 
         return output_tensor.squeeze(0)
+
+
+    def generate_pad_mask(self, x):
+        return x == self.pad_id
+
+    def generate_square_subsequent_mask(self, sz):
+        return torch.triu(torch.full((sz, sz), float('-inf')), diagonal=1).to(self.device)
