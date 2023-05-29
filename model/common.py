@@ -1,6 +1,10 @@
-import math, torch
+import copy, math, torch
 import torch.nn as nn
 
+
+
+def clones(module, N):
+    return nn.ModuleList([copy.deepcopy(module) for _ in range(N)])
 
 
 def shift_trg(x):
@@ -39,8 +43,10 @@ class Embeddings(nn.Module):
 
         self.pos_emb = PositionalEncoding(config)
         self.fc = nn.Linear(config.emb_dim, config.hidden_dim)
+        self.dropout = nn.Dropout(config.dropout_ratio)
+
 
     def forward(self, x):
         out = self.tok_emb(x) * self.scale
         out = self.pos_emb(out)
-        return self.fc(out)
+        return self.dropout(self.fc(out))

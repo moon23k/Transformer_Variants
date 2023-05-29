@@ -25,15 +25,16 @@ class RecurrentEncoder(nn.Module):
     def __init__(self, config):
         super(RecurrentEncoder, self).__init__()    
 
-        self.embeddings = Embeddings(config)
         self.n_layers = config.n_layers
+        self.embeddings = Embeddings(config)
         self.time_signal = generate_signal(512, config.hidden_dim).to(config.device)
         self.pos_signal = generate_signal(config.n_layers, config.hidden_dim).to(config.device)
         self.layer = nn.TransformerEncoderLayer(d_model=config.hidden_dim,
                                                 nhead=config.n_heads,
                                                 dim_feedforward=config.pff_dim,
-                                                batch_first=True,
-                                                norm_first=True)
+                                                dropout=config.dropout_ratio,
+                                                batch_first=True)
+        self.norm = nn.LayerNorm(config.hidden_dim)
 
 
     def forward(self, x, x_pad_mask):
@@ -45,7 +46,7 @@ class RecurrentEncoder(nn.Module):
             x += self.pos_signal[:, l, :].unsqueeze(1).repeat(1, seq_len, 1)
             x = self.layer(x, src_key_padding_mask=x_pad_mask)
         
-        return x
+        return self.norm(x)
 
 
 
@@ -53,15 +54,17 @@ class RecurrentDecoder(nn.Module):
     def __init__(self, config):
         super(RecurrentDecoder, self).__init__()    
 
-        self.embeddings = Embeddings(config)
         self.n_layers = config.n_layers
+        self.embeddings = Embeddings(config)
         self.time_signal = generate_signal(512, config.hidden_dim).to(config.device)
         self.pos_signal = generate_signal(config.n_layers, config.hidden_dim).to(config.device)
         self.layer = nn.TransformerDecoderLayer(d_model=config.hidden_dim,
                                                 nhead=config.n_heads,
                                                 dim_feedforward=config.pff_dim,
-                                                batch_first=True,
-                                                norm_first=True)
+                                                dropout=config.dropout_ratio,
+                                                batch_first=True)
+        self.norm = nn.LayerNorm(config.hidden_dim)
+
 
     def forward(self, x, m, tgt_mask, tgt_key_padding_mask, memory_key_padding_mask):
         x = self.embeddings(x)
@@ -74,7 +77,7 @@ class RecurrentDecoder(nn.Module):
                            tgt_mask=tgt_mask, 
                            tgt_key_padding_mask=tgt_key_padding_mask, 
                            memory_key_padding_mask=memory_key_padding_mask)
-        return x
+        return self.norm(x)
 
 
 
@@ -101,8 +104,10 @@ class RecurrentTransformer(nn.Module):
         trg_pad_mask = (trg == self.pad_id)
         trg_mask = generate_square_subsequent_mask(trg.size(1)).to(self.device)
 
-        memory = self.encode(src_emb, src_pad_mask)
-        dec_out = self.decode(trg_emb, memory, trg_mask, trg_pad_mask, src_pad_mask)
+        memory = self.encoder(src, src_key_padding_mask=src_pad_mask)
+        dec_out = self.decoder(trg_emb, memory, tgt_mask=trg_mask, 
+                               tgt_key_padding_mask=trg_pad_mask, 
+                               memory_key_padding_mask=src_pad_mask)
         logit = self.generator(dec_out)
         
         self.out.logit = logit
@@ -111,12 +116,3 @@ class RecurrentTransformer(nn.Module):
         
         return self.out
 
-
-    def encode(self, src_emb, src_pad_mask):
-        return self.encoder(src_emb, src_pad_mask)
-
-
-    def decode(self, trg_emb, memory, trg_mask, trg_pad_mask, src_pad_mask):
-        return self.decoder(trg_emb, memory, tgt_mask=trg_mask,
-                            tgt_key_padding_mask=trg_pad_mask,
-                            memory_key_padding_mask=src_pad_mask)

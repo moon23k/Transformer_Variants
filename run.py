@@ -1,4 +1,4 @@
-import random, argparse
+import os, random, argparse
 
 import torch
 import torch.nn as nn
@@ -46,7 +46,7 @@ class Config(object):
         self.hidden_dim = 512
         self.pff_dim = 2048
         self.n_heads = 8
-        self.n_layers = 3
+        self.n_layers = 6
         self.dropout_ratio = 0.1
 
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -146,8 +146,13 @@ if __name__ == '__main__':
     parser.add_argument('-model', required=True)
     
     args = parser.parse_args()
-    assert args.mode in ['nmt', 'dialog', 'sum']
+    assert args.task in ['nmt', 'dialog', 'sum']
     assert args.mode in ['train', 'test', 'inference']
     assert args.model in ['vanilla', 'recurrent', 'evolved']
     
+    if args.mode == 'train':
+        os.makedirs(f"ckpt/{args.task}", exist_ok=True)
+    else:
+        assert os.path.exists(f'ckpt/{args.task}/{args.model}.pt')
+
     main(args)

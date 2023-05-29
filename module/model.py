@@ -6,10 +6,11 @@ from model.evolved import EvolvedTransformer
 
 
 
-def init_xavier(model):
-    for name, param in model.named_parameters():
-        if name not in ['norm', 'bias']:
+def init_weights(model):
+    for p in model.parameters():
+        if p.dim() > 1:
             nn.init.xavier_uniform_(p)
+
 
 
 
@@ -28,13 +29,7 @@ def print_model_desc(model):
         buffer_size += buffer.nelement() * buffer.element_size()
 
     size_all_mb = (param_size + buffer_size) / 1024**2
-    print(f"--- Model  Size : {size_all_mb:.3f} MB")
-
-    #GPU Memory Occupations
-    nvmlInit()
-    handle = nvmlDeviceGetHandleByIndex(0)
-    info = nvmlDeviceGetMemoryInfo(handle)
-    print(f"--- GPU memory occupied: {info.used//1024**2} MB\n")
+    print(f"--- Model  Size : {size_all_mb:.3f} MB\n")
 
 
 
@@ -47,7 +42,7 @@ def load_model(config):
     elif config.model_type == 'evolved':
         model = EvolvedTransformer(config)
 
-    model.apply(init_xavier)
+    init_weights(model)
     print(f"Initialized {config.model_type} model for task has loaded")
 
     if config.mode != 'train':

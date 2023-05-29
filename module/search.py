@@ -105,14 +105,14 @@ class Search:
     def greedy_search(self, input_tensor):
         output_tensor = torch.LongTensor([[self.bos_id]]).to(self.device)
 
-        src_pad_mask = self.generate_pad_mask(input_tensor)
+        src_pad_mask = torch.zeros_like(src, dtype=torch.bool).to(self.device)
         src_emb = self.model.enc_emb(input_tensor)
         memory = self.model.encoder(src_emb, src_key_padding_mask=src_pad_mask)        
 
         
         for i in range(1, self.max_len):
             #Masking
-            trg_pad_mask = self.generate_pad_mask(output_tensor)
+            trg_pad_mask = torch.zeros_like(src, dtype=torch.bool).to(self.device)
             trg_mask = self.generate_square_subsequent_mask(output_tensor.size(1))
 
             #Decoding and Generating
@@ -123,7 +123,7 @@ class Search:
 
             logit = self.model.generator(dec_out)
             
-            next_token = logit[:, -1].argmax(-1).view(batch_size, 1)
+            next_token = logit[:, -1].argmax(-1).view(-1)
             output_tensor = torch.cat([output_tensor, next_token], dim=1)
 
             if next_token == self.eos_id:

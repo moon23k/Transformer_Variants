@@ -1,4 +1,4 @@
-import copy, torch
+import torch
 import torch.nn as nn
 import torch.nn.init as init
 from torch.nn import functional as F
@@ -6,9 +6,6 @@ from collections import namedtuple
 from model.common import *
 
 
-
-def clones(module, N):
-    return nn.ModuleList([copy.deepcopy(module) for _ in range(N)])
 
 
 #GLU
@@ -216,14 +213,16 @@ class EvolvedEncoder(nn.Module):
     def __init__(self, config):
         super(EvolvedEncoder, self).__init__()
 
-        self.emb = Embeddings(config)
+        self.embeddings = Embeddings(config)
         self.cells = clones(EncoderCell(config), config.n_layers//2)
+        self.norm = nn.LayerNorm(config.hidden_dim)
 
 
     def forward(self, x, x_pad_mask):
+        x = self.embeddings(x)
         for cell in self.cells:
             x = cell(x, x_pad_mask)
-        return x
+        return self.norm(x)
 
 
 
@@ -231,14 +230,16 @@ class EvolvedDecoder(nn.Module):
     def __init__(self, config):
         super(EvolvedDecoder, self).__init__()
 
-        self.emb = Embeddings(config)
+        self.embeddings = Embeddings(config)
         self.cells = clones(DecoderCell(config), config.n_layers//2)
+        self.norm = nn.LayerNorm(config.hidden_dim)
 
 
     def forward(self, x, memory, x_mask, memory_mask, x_pad_mask):
+        x = self.embeddings(x)
         for cell in self.cells:
             x = cell(x, memory, x_mask, memory_mask, x_pad_mask)
-        return x
+        return self.norm(x)
 
 
 class EvolvedTransformer(nn.Module):
@@ -248,9 +249,6 @@ class EvolvedTransformer(nn.Module):
         self.pad_id = config.pad_id
         self.device = config.device
         self.vocab_size = config.vocab_size
-
-        self.enc_emb = Embeddings(config)
-        self.dec_emb = Embeddings(config)
 
         self.encoder = EvolvedEncoder(config) 
         self.decoder = EvolvedDecoder(config)
@@ -268,11 +266,8 @@ class EvolvedTransformer(nn.Module):
         trg_pad_mask = (trg == self.pad_id)
         trg_mask = generate_square_subsequent_mask(trg.size(1)).to(self.device)
 
-        src_emb = self.enc_emb(src)
-        trg_emb = self.dec_emb(trg)
-
-        memory = self.encoder(src_emb, src_pad_mask)
-        dec_out = self.decoder(trg_emb, memory, trg_mask, src_pad_mask, trg_pad_mask)
+        memory = self.encoder(src, src_pad_mask)
+        dec_out = self.decoder(trg, memory, trg_mask, src_pad_mask, trg_pad_mask)
         logit = self.generator(dec_out)
         
         self.out.logit = logit
