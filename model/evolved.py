@@ -76,7 +76,7 @@ class EncoderCell(nn.Module):
                                  nn.Linear(config.pff_dim, config.hidden_dim))
 
 
-    def forward(self, src, src_pad_mask):
+    def forward(self, src, src_key_padding_mask):
         ### Block_01
         B01_out = self.glu(self.layer_norms[0](src)) #Dim:512
 
@@ -106,7 +106,7 @@ class EncoderCell(nn.Module):
         ### Block_04
         B04_out = self.layer_norms[2](B03_out)
         attention_out = self.attention(B04_out, B04_out, B04_out,
-                                       key_padding_mask = src_pad_mask,
+                                       key_padding_mask = src_key_padding_mask,
                                        need_weights=False)[0]
         B04_out += attention_out #Dim:512
 
@@ -149,19 +149,19 @@ class DecoderCell(nn.Module):
                                  nn.Linear(config.pff_dim, config.hidden_dim))
 
 
-    def forward(self, trg, memory, trg_mask, src_pad_mask, trg_pad_mask):
+    def forward(self, trg, memory, tgt_mask, tgt_key_padding_mask, memory_key_padding_mask):
 
         ### Block_01
         B01_out = self.layer_norms[0](trg)
 
         left_out = self.left_attn(B01_out, B01_out, B01_out,
-                                  key_padding_mask=trg_pad_mask,
-                                  attn_mask=trg_mask,
+                                  key_padding_mask=tgt_key_padding_mask,
+                                  attn_mask=tgt_mask,
                                   need_weights=False)[0]
 
         right_out = self.right_attn(B01_out, B01_out, B01_out,
-                                    key_padding_mask=trg_pad_mask,
-                                    attn_mask=trg_mask,
+                                    key_padding_mask=tgt_key_padding_mask,
+                                    attn_mask=tgt_mask,
                                     need_weights=False)[0]
 
         B01_out = left_out + right_out
@@ -187,8 +187,8 @@ class DecoderCell(nn.Module):
         ### Block_04
         B04_out = self.layer_norms[2](B03_out)
         B04_out = self.self_attn(B04_out, B04_out, B04_out,
-                                 key_padding_mask=trg_pad_mask,
-                                 attn_mask=trg_mask,
+                                 key_padding_mask=tgt_key_padding_mask,
+                                 attn_mask=tgt_mask,
                                  need_weights=False)[0]
         B04_out += B03_out
 
@@ -196,7 +196,7 @@ class DecoderCell(nn.Module):
         ### Block_05
         B05_out = self.layer_norms[3](B04_out)
         B05_out = self.src_attn(B05_out, memory, memory,
-                                key_padding_mask=src_pad_mask,
+                                key_padding_mask=memory_key_padding_mask,
                                 need_weights=False)[0]
         B05_out += B04_out        
 
@@ -215,14 +215,13 @@ class EvolvedEncoder(nn.Module):
 
         self.embeddings = Embeddings(config)
         self.cells = clones(EncoderCell(config), config.n_layers//2)
-        self.norm = nn.LayerNorm(config.hidden_dim)
 
 
-    def forward(self, x, x_pad_mask):
+    def forward(self, x, src_key_padding_mask):
         x = self.embeddings(x)
         for cell in self.cells:
-            x = cell(x, x_pad_mask)
-        return self.norm(x)
+            x = cell(x, src_key_padding_mask=src_key_padding_mask)
+        return x
 
 
 
@@ -232,14 +231,15 @@ class EvolvedDecoder(nn.Module):
 
         self.embeddings = Embeddings(config)
         self.cells = clones(DecoderCell(config), config.n_layers//2)
-        self.norm = nn.LayerNorm(config.hidden_dim)
 
 
-    def forward(self, x, memory, x_mask, memory_mask, x_pad_mask):
+    def forward(self, x, memory, tgt_mask, tgt_key_padding_mask, memory_key_padding_mask):
         x = self.embeddings(x)
         for cell in self.cells:
-            x = cell(x, memory, x_mask, memory_mask, x_pad_mask)
-        return self.norm(x)
+            x = cell(x, memory, tgt_mask=tgt_mask, 
+                     tgt_key_padding_mask=tgt_key_padding_mask, 
+                     memory_key_padding_mask=memory_key_padding_mask)
+        return x
 
 
 class EvolvedTransformer(nn.Module):
@@ -267,7 +267,7 @@ class EvolvedTransformer(nn.Module):
         trg_mask = generate_square_subsequent_mask(trg.size(1)).to(self.device)
 
         memory = self.encoder(src, src_pad_mask)
-        dec_out = self.decoder(trg, memory, trg_mask, src_pad_mask, trg_pad_mask)
+        dec_out = self.decoder(trg, memory, trg_mask, trg_pad_mask, src_pad_mask)
         logit = self.generator(dec_out)
         
         self.out.logit = logit

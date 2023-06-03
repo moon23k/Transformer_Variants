@@ -40,13 +40,18 @@ class Embeddings(nn.Module):
 
         self.tok_emb = nn.Embedding(config.vocab_size, config.emb_dim)
         self.scale = math.sqrt(config.emb_dim)
-
         self.pos_emb = PositionalEncoding(config)
-        self.fc = nn.Linear(config.emb_dim, config.hidden_dim)
         self.dropout = nn.Dropout(config.dropout_ratio)
+
+        self.use_fc_layer = (config.emb_dim != config.hidden_dim)
+        if self.use_fc_layer:
+            self.fc = nn.Linear(config.emb_dim, config.hidden_dim)
 
 
     def forward(self, x):
         out = self.tok_emb(x) * self.scale
         out = self.pos_emb(out)
-        return self.dropout(self.fc(out))
+
+        if self.use_fc_layer:
+            return self.dropout(self.fc(out))
+        return self.dropout(out)

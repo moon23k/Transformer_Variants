@@ -17,14 +17,13 @@ class VanillaEncoder(nn.Module):
                                            activation='gelu',
                                            batch_first=True)
         self.layers = clones(layer, config.n_layers)
-        self.norm = nn.LayerNorm(config.hidden_dim)
 
 
-    def forward(self, x, x_pad_mask):
+    def forward(self, x, src_key_padding_mask):
         x = self.embeddings(x)
         for layer in self.layers:
-            x = layer(x, src_key_padding_mask=x_pad_mask)
-        return self.norm(x)
+            x = layer(x, src_key_padding_mask=src_key_padding_mask)
+        return x
 
 
 
@@ -40,16 +39,15 @@ class VanillaDecoder(nn.Module):
                                            activation='gelu',
                                            batch_first=True)
         self.layers = clones(layer, config.n_layers)
-        self.norm = nn.LayerNorm(config.hidden_dim)
 
 
-    def forward(self, x, memory, x_mask, x_pad_mask, m_pad_mask):
+    def forward(self, x, memory, tgt_mask, tgt_key_padding_mask, memory_key_padding_mask):
         x = self.embeddings(x)
         for layer in self.layers:
-            x = layer(x, memory, tgt_mask=x_mask,
-                      tgt_key_padding_mask=x_pad_mask,
-                      memory_key_padding_mask=m_pad_mask)
-        return self.norm(out)
+            x = layer(x, memory, tgt_mask=tgt_mask,
+                      tgt_key_padding_mask=tgt_key_padding_mask,
+                      memory_key_padding_mask=memory_key_padding_mask)
+        return x
 
 
 

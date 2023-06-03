@@ -37,14 +37,14 @@ class RecurrentEncoder(nn.Module):
         self.norm = nn.LayerNorm(config.hidden_dim)
 
 
-    def forward(self, x, x_pad_mask):
+    def forward(self, x, src_key_padding_mask):
         x = self.embeddings(x)
         seq_len = x.size(1)
 
         for l in range(self.n_layers):
             x += self.time_signal[:, :seq_len, :]
             x += self.pos_signal[:, l, :].unsqueeze(1).repeat(1, seq_len, 1)
-            x = self.layer(x, src_key_padding_mask=x_pad_mask)
+            x = self.layer(x, src_key_padding_mask=src_key_padding_mask)
         
         return self.norm(x)
 
@@ -105,7 +105,7 @@ class RecurrentTransformer(nn.Module):
         trg_mask = generate_square_subsequent_mask(trg.size(1)).to(self.device)
 
         memory = self.encoder(src, src_key_padding_mask=src_pad_mask)
-        dec_out = self.decoder(trg_emb, memory, tgt_mask=trg_mask, 
+        dec_out = self.decoder(trg, memory, tgt_mask=trg_mask, 
                                tgt_key_padding_mask=trg_pad_mask, 
                                memory_key_padding_mask=src_pad_mask)
         logit = self.generator(dec_out)

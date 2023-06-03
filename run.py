@@ -25,7 +25,6 @@ class Config(object):
         self.model_type = args.model
         self.ckpt = f"ckpt/{self.task}/{self.model_type}.pt"
 
-
         #Training Configs
         self.n_epochs = 10
         self.lr = 1e-4
@@ -35,18 +34,17 @@ class Config(object):
         self.iters_to_accumulate = 4
 
         self.batch_size = 128
-        if self.mode == 'test':
-            self.batch_size = 1
         if self.task == 'sum':
             self.batch_size = 64
-
+        if self.mode == 'test':
+            self.batch_size = 1
 
         #Model Configs
         self.emb_dim = 256
-        self.hidden_dim = 512
-        self.pff_dim = 2048
+        self.hidden_dim = 256
+        self.pff_dim = 512
         self.n_heads = 8
-        self.n_layers = 6
+        self.n_layers = 4
         self.dropout_ratio = 0.1
 
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')

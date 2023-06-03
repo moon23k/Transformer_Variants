@@ -43,7 +43,7 @@ def load_model(config):
         model = EvolvedTransformer(config)
 
     init_weights(model)
-    print(f"Initialized {config.model_type} model for task has loaded")
+    print(f"Initialized {config.model_type} model for {config.task} task has loaded")
 
     if config.mode != 'train':
         assert os.path.exists(config.ckpt)

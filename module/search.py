@@ -38,15 +38,15 @@ class Search:
         return score
 
 
-    def get_nodes(self, batch_size):
+    def get_nodes(self):
         Node = self.Node
         nodes = PriorityQueue()
-        start_tensor = torch.zeros((batch_size, 1), dtype=torch.long).fill_(self.bos_id).to(self.device)
+        start_tensor = torch.LongTensor([[self.bos_id]]).to(self.device)
 
-        start_node = Node(prev_node = [None for _ in range(batch_size)],
+        start_node = Node(prev_node = None,
                           pred = start_tensor,
-                          log_prob = [0.0 for _ in range(batch_size)],
-                          length = [0 for _ in range(batch_size)])
+                          log_prob = 0.0,
+                          length = 0)
 
         for _ in range(self.beam_size):
             nodes.put((0, start_node))
@@ -56,11 +56,10 @@ class Search:
 
 
     def beam_search(self, input_tensor):
-        batch_size = input_tensor.size(0)
-        Node, nodes, end_nodes, top_nodes = self.get_nodes(batch_size)
+        Node, nodes, end_nodes, top_nodes = self.get_nodes()
 
-        src_pad_mask = self.generate_pad_mask(input_tensor)
-        memory = self.model.encoder(input_tensor, src_key_padding_mask=src_pad_mask)        
+        src_pad_mask = torch.zeros_like(input_tensor, dtype=torch.bool).to(self.device)
+        memory = self.model.encoder(input_tensor, src_key_padding_mask=src_pad_mask)
 
         for t in range(self.max_len):
             curr_nodes = [nodes.get() for _ in range(self.beam_size)]
@@ -71,9 +70,12 @@ class Search:
                     continue
 
                 d_input = curr_node.pred 
-                d_mask = self.model.dec_mask(d_input)
-                d_out = self.model.decoder(d_input, memory, e_mask, d_mask)
-                out = self.model.fc_out(d_out)[:, -1]
+                d_pad_mask = torch.zeros_like(d_input, dtype=torch.bool).to(self.device)
+                d_mask = self.generate_square_subsequent_mask(d_input.size(1))
+                d_out = self.model.decoder(d_input, memory, tgt_mask=d_mask, 
+                                           tgt_key_padding_mask=d_pad_mask,
+                                           memory_key_padding_mask=src_pad_mask)
+                out = self.model.generator(d_out)[:, -1]
                 
                 logits, preds = torch.topk(out, self.beam_size)
                 logits, preds = logits, preds
@@ -105,25 +107,23 @@ class Search:
     def greedy_search(self, input_tensor):
         output_tensor = torch.LongTensor([[self.bos_id]]).to(self.device)
 
-        src_pad_mask = torch.zeros_like(src, dtype=torch.bool).to(self.device)
-        src_emb = self.model.enc_emb(input_tensor)
-        memory = self.model.encoder(src_emb, src_key_padding_mask=src_pad_mask)        
+        src_pad_mask = torch.zeros_like(input_tensor, dtype=torch.bool).to(self.device)
+        memory = self.model.encoder(input_tensor, src_key_padding_mask=src_pad_mask)        
 
         
         for i in range(1, self.max_len):
             #Masking
-            trg_pad_mask = torch.zeros_like(src, dtype=torch.bool).to(self.device)
+            trg_pad_mask = torch.zeros_like(output_tensor, dtype=torch.bool).to(self.device)
             trg_mask = self.generate_square_subsequent_mask(output_tensor.size(1))
 
             #Decoding and Generating
-            dec_emb = self.model.dec_emb(output_tensor)
-            dec_out = self.model.decoder(dec_emb, memory, tgt_mask=trg_mask, 
+            dec_out = self.model.decoder(output_tensor, memory, tgt_mask=trg_mask, 
                                          tgt_key_padding_mask=trg_pad_mask, 
                                          memory_key_padding_mask=src_pad_mask)
 
             logit = self.model.generator(dec_out)
             
-            next_token = logit[:, -1].argmax(-1).view(-1)
+            next_token = logit[:, -1].argmax(-1).unsqueeze(0)
             output_tensor = torch.cat([output_tensor, next_token], dim=1)
 
             if next_token == self.eos_id:
@@ -131,9 +131,6 @@ class Search:
 
         return output_tensor.squeeze(0)
 
-
-    def generate_pad_mask(self, x):
-        return x == self.pad_id
 
     def generate_square_subsequent_mask(self, sz):
         return torch.triu(torch.full((sz, sz), float('-inf')), diagonal=1).to(self.device)
