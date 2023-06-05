@@ -54,7 +54,7 @@ class Trainer:
 
     def train(self):
         records = []
-        best_loss = float('inf')
+        prev_loss, best_loss = float('inf'), float('inf')
         patience = self.patience
 
         for epoch in range(1, self.n_epochs + 1):
@@ -78,17 +78,19 @@ class Trainer:
                             'model_state_dict': self.model.state_dict(),
                             'optimizer_state_dict': self.optimizer.state_dict()},
                             self.ckpt)
-                #patience intialize
-                if self.early_stop:
+            
+            #Early Stopping Process
+            if self.early_stop:
+                if prev_loss > val_loss:
                     patience = self.patience
             
-            else:
-                if not self.early_stop:
-                    continue
-                patience -= 1
-                if not patience:
-                    print('\n--- Training Ealry Stopped ---')
-                    break
+                else:
+                    patience -= 1
+                    if not patience:
+                        print('--- Training Ealry Stopped ---\n')
+                        break
+
+                prev_loss = val_loss
 
             
         #save train_records
