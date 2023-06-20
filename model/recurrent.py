@@ -2,8 +2,7 @@ import numpy as np
 import torch, math
 import torch.nn as nn
 from collections import namedtuple
-from model.common import (Embeddings, shift_trg, 
-                          generate_square_subsequent_mask)
+from model.common import shift_trg, generate_square_subsequent_mask
 
 
 
@@ -26,7 +25,7 @@ class RecurrentEncoder(nn.Module):
         super(RecurrentEncoder, self).__init__()    
 
         self.n_layers = config.n_layers
-        self.embeddings = Embeddings(config)
+        self.embedding = nn.Embedding(config.emb_dim)
         self.time_signal = generate_signal(512, config.hidden_dim).to(config.device)
         self.pos_signal = generate_signal(config.n_layers, config.hidden_dim).to(config.device)
         self.layer = nn.TransformerEncoderLayer(d_model=config.hidden_dim,
@@ -38,7 +37,7 @@ class RecurrentEncoder(nn.Module):
 
 
     def forward(self, x, src_key_padding_mask):
-        x = self.embeddings(x)
+        x = self.embedding(x)
         seq_len = x.size(1)
 
         for l in range(self.n_layers):
@@ -55,7 +54,7 @@ class RecurrentDecoder(nn.Module):
         super(RecurrentDecoder, self).__init__()    
 
         self.n_layers = config.n_layers
-        self.embeddings = Embeddings(config)
+        self.embedding = nn.Embedding(config.emb_dim)
         self.time_signal = generate_signal(512, config.hidden_dim).to(config.device)
         self.pos_signal = generate_signal(config.n_layers, config.hidden_dim).to(config.device)
         self.layer = nn.TransformerDecoderLayer(d_model=config.hidden_dim,
@@ -67,7 +66,7 @@ class RecurrentDecoder(nn.Module):
 
 
     def forward(self, x, m, tgt_mask, tgt_key_padding_mask, memory_key_padding_mask):
-        x = self.embeddings(x)
+        x = self.embedding(x)
         seq_len = x.size(1)
 
         for l in range(self.n_layers):

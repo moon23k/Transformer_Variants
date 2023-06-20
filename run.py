@@ -101,7 +101,7 @@ def inference(config, model, tokenizer):
         else:
             output_seq = search_module.greedy_search(input_seq)
 
-        output_seq = tokneizer.decode(output_seq)
+        output_seq = tokenizer.decode(output_seq)
 
         print(f"Model Out Sequence >> {output_seq}")       
 
