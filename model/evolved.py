@@ -15,7 +15,9 @@ class GatedConvolution(nn.Module):
         
         self.conv = nn.Conv1d(in_channels=hidden_dim, 
                               out_channels=hidden_dim * 2,
-                              kernel_size=kernel_size, padding=padding, bias=True)
+                              kernel_size=kernel_size, 
+                              padding=padding, bias=True)
+
         init.xavier_uniform_(self.conv.weight, gain=1)
 
     def forward(self,x):

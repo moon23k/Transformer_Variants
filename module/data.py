@@ -34,26 +34,26 @@ class Collator(object):
         self.pad_id = pad_id
 
     def __call__(self, batch):
-        src_batch, trg_batch = [], []
+        src_batch, trg_batch = zip(*batch)
         
-        for src, trg in batch:
-            src_batch.append(torch.LongTensor(src))
-            trg_batch.append(torch.LongTensor(trg))
-        
-        src_batch = self.pad_batch(src_batch)
-        trg_batch = self.pad_batch(trg_batch)
-        
-        return {'src': src_batch, 'trg': trg_batch}
+        return {'src': self.pad_batch(src_batch), 
+                'trg': self.pad_batch(trg_batch)}
 
     def pad_batch(self, batch):
-        return pad_sequence(batch, batch_first=True, padding_value=self.pad_id)
+        return pad_sequence(
+            batch, 
+            batch_first=True, 
+            padding_value=self.pad_id
+        )
 
 
 
 def load_dataloader(config, split):
 
-    return DataLoader(Dataset(config.task, split), 
-                      batch_size=config.batch_size, 
-                      shuffle=True if config.mode == 'train' else False,
-                      collate_fn=Collator(config.pad_id),
-                      num_workers=2)
+    return DataLoader(
+        Dataset(config.task, split), 
+        batch_size=config.batch_size, 
+        shuffle=True if config.mode == 'train' else False,
+        collate_fn=Collator(config.pad_id),
+        num_workers=2
+    )

@@ -1,5 +1,4 @@
 import json, math, time, torch, evaluate
-from tqdm import tqdm
 from module.search import Search
 from transformers import BertModel, BertTokenizerFast
 
@@ -22,8 +21,9 @@ class Tester:
 
         elif self.task == 'dialog':
             self.metric_name = 'BERT'
-            self.metric_tokenizer = BertTokenizerFast.from_pretrained('bert-base-uncased')
-            self.metric_model = BertModel.from_pretrained('bert-base-uncased')
+            mname = 'bert-base-uncased'
+            self.metric_tokenizer = BertTokenizerFast.from_pretrained(mname)
+            self.metric_model = BertModel.from_pretrained(mname)
             self.metric_model.eval()
 
         elif self.task == 'sum':
@@ -40,7 +40,7 @@ class Tester:
         print(f'Test Results on {self.task.upper()}')
 
         with torch.no_grad():
-            for batch in tqdm(self.dataloader):
+            for batch in self.dataloader:
             
                 src = batch['src'].to(self.device)
                 trg = batch['trg'].to(self.device)
@@ -73,7 +73,11 @@ class Tester:
 
         #For Dialogue Generation Task
         elif self.task == 'dialog':
-            encoding = self.metric_tokenizer(pred, label, padding=True, truncation=True, return_tensors='pt')
+            
+            encoding = self.metric_tokenizer(
+                pred, label, padding=True, truncation=True, return_tensors='pt'
+            )
+
             bert_out = self.metric_model(**encoding)[0]
 
             normalized = torch.nn.functional.normalize(bert_out[:, 0, :], p=2, dim=-1)

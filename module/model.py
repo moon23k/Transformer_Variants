@@ -1,8 +1,11 @@
 import os, torch
 import torch.nn as nn
-from model.vanilla import VanillaTransformer
-from model.recurrent import RecurrentTransformer
-from model.evolved import EvolvedTransformer
+from model import (
+    StandardTransformer,
+    RecurrentTransformer,
+    EvolvedTransformer
+)
+
 
 
 
@@ -10,7 +13,6 @@ def init_weights(model):
     for p in model.parameters():
         if p.dim() > 1:
             nn.init.xavier_uniform_(p)
-
 
 
 
@@ -35,8 +37,8 @@ def print_model_desc(model):
 
 
 def load_model(config):
-    if config.model_type == 'vanilla':
-        model = VanillaTransformer(config)
+    if config.model_type == 'standard':
+        model = StandardTransformer(config)
     elif config.model_type == 'recurrent':
         model = RecurrentTransformer(config)
     elif config.model_type == 'evolved':

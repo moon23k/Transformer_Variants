@@ -2,7 +2,8 @@ import numpy as np
 import torch, math
 import torch.nn as nn
 from collections import namedtuple
-from model.common import shift_trg, generate_square_subsequent_mask
+from .common import shift_trg, generate_square_subsequent_mask
+
 
 
 
@@ -18,6 +19,8 @@ def generate_signal(length, channels, min_timescale=1.0, max_timescale=1.0e4):
     signal =  signal.reshape([1, length, channels])
 
     return torch.from_numpy(signal).type(torch.FloatTensor)
+
+
 
 
 class RecurrentEncoder(nn.Module):
@@ -49,6 +52,7 @@ class RecurrentEncoder(nn.Module):
 
 
 
+
 class RecurrentDecoder(nn.Module):
     def __init__(self, config):
         super(RecurrentDecoder, self).__init__()    
@@ -77,6 +81,7 @@ class RecurrentDecoder(nn.Module):
                            tgt_key_padding_mask=tgt_key_padding_mask, 
                            memory_key_padding_mask=memory_key_padding_mask)
         return self.norm(x)
+
 
 
 

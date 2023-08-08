@@ -1,66 +1,23 @@
-import os, random, argparse
+import os, yaml, argparse, torch
 
-import torch
-import torch.nn as nn
-import torch.backends.cudnn as cudnn
+from tokenizers import Tokenizer
+from tokenizers.processors import TemplateProcessing
 
-import numpy as np
-import sentencepiece as spm
-
-from module.model import load_model
-from module.data import load_dataloader
-
-from module.train import Trainer
-from module.test import Tester
-from module.search import Search
-
-
-
-
-class Config(object):
-    def __init__(self, args):    
-
-        self.task = args.task
-        self.mode = args.mode
-        self.model_type = args.model
-        self.ckpt = f"ckpt/{self.task}/{self.model_type}.pt"
-
-        #Training Configs
-        self.n_epochs = 10
-        self.lr = 1e-4
-        self.clip = 1
-        self.early_stop = True
-        self.patience = 3
-        self.iters_to_accumulate = 4
-
-        self.batch_size = 128
-        if self.task == 'sum':
-            self.batch_size = 64
-        if self.mode == 'test':
-            self.batch_size = 1
-
-        #Model Configs
-        self.emb_dim = 256
-        self.hidden_dim = 256
-        self.pff_dim = 512
-        self.n_heads = 8
-        self.n_layers = 4
-        self.dropout_ratio = 0.1
-
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        if self.mode == 'inference':
-            self.search_method = args.search
-            self.device = torch.device('cpu')
-
-
-    def print_attr(self):
-        for attribute, value in self.__dict__.items():
-            print(f"* {attribute}: {value}")
-
+from module import (
+    load_dataloader,
+    load_model,
+    Trainer,
+    Tester,
+    Search
+)
 
 
 
 def set_seed(SEED=42):
+    import random
+    import numpy as np
+    import torch.backends.cudnn as cudnn
+
     random.seed(SEED)
     np.random.seed(SEED)
     torch.manual_seed(SEED)
@@ -71,11 +28,52 @@ def set_seed(SEED=42):
 
 
 
-def load_tokenizer(task):
-    tokenizer = spm.SentencePieceProcessor()
-    tokenizer.load(f'data/{task}/tokenizer.model')
-    tokenizer.SetEncodeExtraOptions('bos:eos')    
-    return tokenizer    
+class Config(object):
+    def __init__(self, args):    
+
+        with open('config.yaml', 'r') as f:
+            params = yaml.load(f, Loader=yaml.FullLoader)
+            for group in params.keys():
+                for key, val in params[group].items():
+                    setattr(self, key, val)
+
+
+        self.task = args.task
+        self.mode = args.mode
+        self.model_type = args.model
+        self.search_method = args.search
+
+        self.ckpt = f"ckpt/{self.task}/{self.model_type}.pt"
+        self.tokenizer_path = f'data/{self.task}/tokenizer.json'
+
+        if self.task == 'sum':
+            self.batch_size = self.batch_size // 4
+
+        use_cuda = torch.cuda.is_available()
+        self.device_type = 'cuda' \
+                           if use_cuda and self.mode != 'inference' \
+                           else 'cpu'
+        self.device = torch.device(self.device_type)
+
+
+    def print_attr(self):
+        for attribute, value in self.__dict__.items():
+            print(f"* {attribute}: {value}")
+
+
+
+def load_tokenizer(config):
+    tokenizer_path = f"data/{config.task}/tokenizer.json"
+    assert os.path.exists(tokenizer_path)
+
+    tokenizer = Tokenizer.from_file(tokenizer_path)    
+    tokenizer.post_processor = TemplateProcessing(
+        single=f"{config.bos_token} $A {config.eos_token}",
+        special_tokens=[(config.bos_token, config.bos_id), 
+                        (config.eos_token, config.eos_id)]
+        )
+    
+    return tokenizer
 
 
 
@@ -111,23 +109,18 @@ def inference(config, model, tokenizer):
 def main(args):
     set_seed()
     config = Config(args)
-
-    tokenizer = load_tokenizer(config.task)
-    setattr(config, 'pad_id', tokenizer.pad_id())
-    setattr(config, 'eos_id', tokenizer.pad_id())
-    setattr(config, 'bos_id', tokenizer.pad_id())
-    setattr(config, 'vocab_size', tokenizer.vocab_size())
     model = load_model(config)
+    tokenizer = load_tokenizer(config)
 
 
     if config.mode == 'train':
-        train_dataloader = load_dataloader(config, 'train')
-        valid_dataloader = load_dataloader(config, 'valid')
+        train_dataloader = load_dataloader(config, tokenizer, 'train')
+        valid_dataloader = load_dataloader(config, tokenizer, 'valid')
         trainer = Trainer(config, model, train_dataloader, valid_dataloader)
         trainer.train()
 
     elif config.mode == 'test':
-        test_dataloader = load_dataloader(config, 'test')
+        test_dataloader = load_dataloader(config, tokenizer, 'test')
         tester = Tester(config, model, tokenizer, test_dataloader)
         tester.test()
 
@@ -146,7 +139,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     assert args.task in ['nmt', 'dialog', 'sum']
     assert args.mode in ['train', 'test', 'inference']
-    assert args.model in ['vanilla', 'recurrent', 'evolved']
+    assert args.model in ['standard', 'recurrent', 'evolved']
     
     if args.mode == 'train':
         os.makedirs(f"ckpt/{args.task}", exist_ok=True)

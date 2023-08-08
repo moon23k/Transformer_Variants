@@ -1,7 +1,10 @@
 import time, math, json, torch
 import torch.nn as nn
 import torch.amp as amp
+
 import torch.optim as optim
+from optim import AdamW
+from optim.lr_scheduler import ReduceLROnPlateau
 
 
 
@@ -21,8 +24,8 @@ class Trainer:
         self.train_dataloader = train_dataloader
         self.valid_dataloader = valid_dataloader
 
-        self.optimizer = optim.AdamW(self.model.parameters(), lr=config.lr)
-        self.scheduler = optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, 'min')
+        self.optimizer = AdamW(self.model.parameters(), lr=config.lr)
+        self.scheduler = ReduceLROnPlateau(self.optimizer, 'min')
 
         self.early_stop = config.early_stop
         self.patience = config.patience        

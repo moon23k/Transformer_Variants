@@ -5,9 +5,9 @@ from model.common import *
 
 
 
-class VanillaEncoder(nn.Module):
+class StandardEncoder(nn.Module):
     def __init__(self, config):
-        super(VanillaEncoder, self).__init__()
+        super(StandardEncoder, self).__init__()
 
         self.embeddings = Embeddings(config)
         layer = nn.TransformerEncoderLayer(d_model=config.hidden_dim,
@@ -27,9 +27,9 @@ class VanillaEncoder(nn.Module):
 
 
 
-class VanillaDecoder(nn.Module):
+class StandardDecoder(nn.Module):
     def __init__(self, config):
-        super(VanillaDecoder, self).__init__()
+        super(StandardDecoder, self).__init__()
 
         self.embeddings = Embeddings(config)
         layer = nn.TransformerDecoderLayer(d_model=config.hidden_dim,
@@ -51,9 +51,9 @@ class VanillaDecoder(nn.Module):
 
 
 
-class VanillaTransformer(nn.Module):
+class StandardTransformer(nn.Module):
     def __init__(self, config):
-        super(VanillaTransformer, self).__init__()
+        super(StandardTransformer, self).__init__()
         
         self.pad_id = config.pad_id
         self.device = config.device
