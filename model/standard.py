@@ -1,7 +1,7 @@
 import math, torch
 import torch.nn as nn
 from collections import namedtuple
-from model.common import *
+from .common import *
 
 
 
@@ -9,13 +9,16 @@ class StandardEncoder(nn.Module):
     def __init__(self, config):
         super(StandardEncoder, self).__init__()
 
+        layer = nn.TransformerEncoderLayer(
+            d_model=config.hidden_dim,
+            nhead=config.n_heads,
+            dim_feedforward=config.pff_dim,
+            dropout=config.dropout_ratio,
+            activation='gelu',
+            batch_first=True
+        )
+
         self.embeddings = Embeddings(config)
-        layer = nn.TransformerEncoderLayer(d_model=config.hidden_dim,
-                                           nhead=config.n_heads,
-                                           dim_feedforward=config.pff_dim,
-                                           dropout=config.dropout_ratio,
-                                           activation='gelu',
-                                           batch_first=True)
         self.layers = clones(layer, config.n_layers)
 
 
@@ -31,22 +34,31 @@ class StandardDecoder(nn.Module):
     def __init__(self, config):
         super(StandardDecoder, self).__init__()
 
+        layer = nn.TransformerDecoderLayer(
+            d_model=config.hidden_dim,
+            nhead=config.n_heads,
+            dim_feedforward=config.pff_dim,
+            dropout=config.dropout_ratio,
+            activation='gelu',
+            batch_first=True
+        )
+
         self.embeddings = Embeddings(config)
-        layer = nn.TransformerDecoderLayer(d_model=config.hidden_dim,
-                                           nhead=config.n_heads,
-                                           dim_feedforward=config.pff_dim,
-                                           dropout=config.dropout_ratio,
-                                           activation='gelu',
-                                           batch_first=True)
         self.layers = clones(layer, config.n_layers)
 
 
-    def forward(self, x, memory, tgt_mask, tgt_key_padding_mask, memory_key_padding_mask):
+    def forward(self, x, memory, tgt_mask, 
+                tgt_key_padding_mask, 
+                memory_key_padding_mask):
+
         x = self.embeddings(x)
         for layer in self.layers:
-            x = layer(x, memory, tgt_mask=tgt_mask,
-                      tgt_key_padding_mask=tgt_key_padding_mask,
-                      memory_key_padding_mask=memory_key_padding_mask)
+            x = layer(
+                x, memory, 
+                tgt_mask=tgt_mask,
+                tgt_key_padding_mask=tgt_key_padding_mask,
+                memory_key_padding_mask=memory_key_padding_mask
+            )
         return x
 
 
@@ -59,13 +71,15 @@ class StandardTransformer(nn.Module):
         self.device = config.device
         self.vocab_size = config.vocab_size
         
-        self.encoder = VanillaEncoder(config)
-        self.decoder = VanillaDecoder(config)
-
+        self.encoder = StandardEncoder(config)
+        self.decoder = StandardDecoder(config)
         self.generator = nn.Linear(config.hidden_dim, config.vocab_size)
-        self.criterion = nn.CrossEntropyLoss()
+        
         self.out = namedtuple('Out', 'logit loss')
-
+        self.criterion = nn.CrossEntropyLoss(
+            ignore_index=config.pad_id, 
+            label_smoothing=0.1
+        ).to(self.device)
         
         
     def forward(self, src, trg):
@@ -78,15 +92,19 @@ class StandardTransformer(nn.Module):
         
         #Actual Processing
         memory = self.encoder(src, src_key_padding_mask=src_pad_mask)
-        dec_out = self.decoder(trg, memory, tgt_mask=trg_mask, 
-                               tgt_key_padding_mask=trg_pad_mask, 
-                               memory_key_padding_mask=src_pad_mask)
+        dec_out = self.decoder(
+            trg, memory, tgt_mask=trg_mask, 
+            tgt_key_padding_mask=trg_pad_mask, 
+            memory_key_padding_mask=src_pad_mask
+        )
         logit = self.generator(dec_out)
         
 
         #Getting Outputs
         self.out.logit = logit
-        self.out.loss = self.criterion(logit.contiguous().view(-1, self.vocab_size), 
-                                       label.contiguous().view(-1))
+        self.out.loss = self.criterion(
+            logit.contiguous().view(-1, self.vocab_size), 
+            label.contiguous().view(-1)
+        )
         
         return self.out

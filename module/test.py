@@ -1,6 +1,4 @@
-import json, math, time, torch, evaluate
-from module.search import Search
-from transformers import BertModel, BertTokenizerFast
+import torch, math, time, evaluate
 
 
 
@@ -9,80 +7,77 @@ class Tester:
         super(Tester, self).__init__()
         
         self.model = model
-        self.task = config.task
         self.tokenizer = tokenizer
-        self.device = config.device
         self.dataloader = test_dataloader
-        self.search = Search(config, self.model)
 
-        if self.task == 'nmt':
-            self.metric_name = 'BLEU'
-            self.metric_module = evaluate.load('bleu')
-
-        elif self.task == 'dialog':
-            self.metric_name = 'BERT'
-            mname = 'bert-base-uncased'
-            self.metric_tokenizer = BertTokenizerFast.from_pretrained(mname)
-            self.metric_model = BertModel.from_pretrained(mname)
-            self.metric_model.eval()
-
-        elif self.task == 'sum':
-            self.metric_name = 'ROUGE'
-            self.metric_module = evaluate.load('rouge')
-
+        self.task = config.task
+        self.bos_id = config.bos_id
+        self.device = config.device
+        self.max_len = config.max_len
+        self.model_type = config.model_type
+        
+        self.metric_name = 'BLEU' if self.task == 'nmt' else 'ROUGE'
+        self.metric_module = evaluate.load(self.metric_name.lower())
+        
 
 
     def test(self):
+        score = 0.0         
         self.model.eval()
-        greedy_score, beam_score = 0, 0
-        tot_data_len = len(self.dataloader)
-        
-        print(f'Test Results on {self.task.upper()}')
 
         with torch.no_grad():
             for batch in self.dataloader:
-            
-                src = batch['src'].to(self.device)
-                trg = batch['trg'].to(self.device)
-        
-                greedy_pred = self.search.greedy_search(src)
-                beam_pred = self.search.beam_search(src)
+                x = batch['src'].to(self.device)
+                y = self.tokenize(batch['trg'])
+
+                pred = self.predict(x)
+                pred = self.tokenize(pred)
                 
-                greedy_score += self.metric_score(greedy_pred, trg)
-                beam_score += self.metric_score(beam_pred, trg)
-        
-        greedy_score = round(greedy_score/tot_data_len, 2)
-        beam_score = round(beam_score/tot_data_len, 2)
-        
-        return greedy_score, beam_score
-        
+                score += self.evaluate(pred, y)
+
+        txt = f"TEST Result on {self.task.upper()} with {self.model_type.upper()} model"
+        txt += f"\n-- Score: {round(score/len(self.dataloader), 2)}\n"
+        print(txt)
 
 
-    def metric_score(self, pred, label):
+    def tokenize(self, batch):
+        return [self.tokenizer.decode(x) for x in batch.tolist()]
 
-        pred = self.tokenizer.decode(pred)
-        label = self.tokenizer.decode(label.tolist())
 
-        #For Translation and Summarization Tasks
-        if self.task != 'dialog':
-            self.metric_module.add_batch(predictions=pred, references=[[l] for l in label])
-            if self.task == 'nmt':
-                score = self.metric_module.compute()['bleu']
-            elif self.task == 'sum':        
-                score = self.metric_module.compute()['rouge2']
+    def predict(self, x):
 
-        #For Dialogue Generation Task
-        elif self.task == 'dialog':
-            
-            encoding = self.metric_tokenizer(
-                pred, label, padding=True, truncation=True, return_tensors='pt'
-            )
+        batch_size = x.size(0)
+        pred = torch.zeros((batch_size, self.max_len))
+        pred = pred.type(torch.LongTensor).to(self.device)
+        pred[:, 0] = self.bos_id
 
-            bert_out = self.metric_model(**encoding)[0]
+        e_mask = self.model.pad_mask(x)
+        memory = self.model.encode(x, e_mask)
 
-            normalized = torch.nn.functional.normalize(bert_out[:, 0, :], p=2, dim=-1)
-            dist = normalized.matmul(normalized.T)
-            sim_matrix = dist.new_ones(dist.shape) - dist
-            score = sim_matrix[0, 1].item()
+        for idx in range(1, self.max_len):
+            y = pred[:, :idx]
+            d_mask = self.model.dec_mask(y)
+            d_out = self.model.decode(y, memory, e_mask, d_mask)
 
-        return (score * 100)
+            logit = self.model.generator(d_out)
+            pred[:, idx] = logit.argmax(dim=-1)[:, -1]
+
+        return pred
+
+
+
+    def evaluate(self, pred, label):
+        #For NMT Evaluation
+        if self.task == 'nmt':
+            score = self.metric_module.compute(
+                predictions=pred, 
+                references =[label]
+            )['bleu']
+        #For Dialg & Sum Evaluation
+        else:
+            score = self.metric_module.compute(
+                predictions=pred, 
+                references =[label]
+            )['rouge2']
+
+        return score * 100

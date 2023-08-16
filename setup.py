@@ -11,7 +11,9 @@ from tokenizers.normalizers import NFD, Lowercase, StripAccents
 
 def load_data(task):
     if task == 'nmt':
-        data = load_dataset('wmt14', 'de-en', split='train')['translation']
+        data = load_dataset(
+            'wmt14', 'de-en', split='train'
+        )['translation']
 
     elif task == 'dialog':
         loaded_data = load_dataset('daily_dialog')
@@ -25,10 +27,8 @@ def load_data(task):
         data = []
         for split in ['train', 'validation', 'test']:
             for elem in loaded_data[split]:
-                data.append({
-                    'article': elem['article'], 
-                    'highlights': elem['highlights']
-                    })
+                data.append({'article': elem['article'], 
+                             'highlights': elem['highlights']})
                 
     return data
 
@@ -45,8 +45,8 @@ def process_nmt(orig_data, volumn=101100):
     
     for elem in orig_data:
         temp_dict = dict()
-        src_len, trg_len = len(src), len(trg)
         src, trg = elem['en'].lower(), elem['de'].lower()
+        src_len, trg_len = len(src), len(trg)
 
         #define filtering conditions
         min_condition = (src_len >= min_len) & (trg_len >= min_len)
@@ -56,9 +56,7 @@ def process_nmt(orig_data, volumn=101100):
         if max_condition & min_condition & dif_condition:
             temp_dict['src'] = src
             temp_dict['trg'] = trg
-            
             processed.append(temp_dict)
-            
             corpus.append(src)
             corpus.append(trg)
             
@@ -76,8 +74,8 @@ def process_nmt(orig_data, volumn=101100):
 
 #Dialog
 def process_dialog(orig_data):
-    src_list, trg_list = [], []
     corpus, processed = [], []
+    src_list, trg_list = [], []
 
     for dial in orig_data:
         dial_list = []
@@ -117,6 +115,7 @@ def process_dialog(orig_data):
             src_list.extend(dial_list[1::2])
             trg_list.extend(dial_list[2::2])   
 
+
     assert len(src_list) == len(trg_list)
     for src, trg in zip(src_list, trg_list):
         temp_dict = dict()
@@ -136,10 +135,10 @@ def process_dialog(orig_data):
 
 
 #Sum
-def process_sum(orig_data, volumn=101100):
+def process_sum(orig_data, volumn=101100):    
+    volumn_cnt = 0
     corpus, processed = [], []
     min_len, max_len = 500, 3000
-    volumn_cnt = 0
 
 
     for elem in orig_data:

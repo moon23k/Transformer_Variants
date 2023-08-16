@@ -112,6 +112,7 @@ class Trainer:
             with torch.autocast(device_type=self.device.type, dtype=torch.float16):
                 loss = self.model(src, trg).loss
                 loss = loss / self.iters_to_accumulate
+            
             #Backward Loss
             self.scaler.scale(loss).backward()        
             
@@ -129,6 +130,7 @@ class Trainer:
         
         epoch_loss = round(epoch_loss / len(self.train_dataloader), 3)
         epoch_ppl = round(math.exp(epoch_loss), 3)    
+        
         return epoch_loss, epoch_ppl
     
 
@@ -146,4 +148,5 @@ class Trainer:
         
         epoch_loss = round(epoch_loss / len(self.valid_dataloader), 3)
         epoch_ppl = round(math.exp(epoch_loss), 3)        
+
         return epoch_loss, epoch_ppl

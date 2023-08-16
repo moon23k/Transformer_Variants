@@ -28,15 +28,26 @@ class RecurrentEncoder(nn.Module):
         super(RecurrentEncoder, self).__init__()    
 
         self.n_layers = config.n_layers
-        self.embedding = nn.Embedding(config.emb_dim)
-        self.time_signal = generate_signal(512, config.hidden_dim).to(config.device)
-        self.pos_signal = generate_signal(config.n_layers, config.hidden_dim).to(config.device)
-        self.layer = nn.TransformerEncoderLayer(d_model=config.hidden_dim,
-                                                nhead=config.n_heads,
-                                                dim_feedforward=config.pff_dim,
-                                                dropout=config.dropout_ratio,
-                                                batch_first=True)
         self.norm = nn.LayerNorm(config.hidden_dim)
+        self.embedding = nn.Embedding(config.emb_dim)
+        
+        self.time_signal = generate_signal(
+            512, config.hidden_dim
+        ).to(config.device)
+
+        self.pos_signal = generate_signal(
+            config.n_layers, config.hidden_dim
+        ).to(config.device)
+        
+
+        self.layer = nn.TransformerEncoderLayer(
+            d_model=config.hidden_dim,
+            nhead=config.n_heads,
+            dim_feedforward=config.pff_dim,
+            dropout=config.dropout_ratio,
+            batch_first=True
+        )
+        
 
 
     def forward(self, x, src_key_padding_mask):
@@ -58,15 +69,25 @@ class RecurrentDecoder(nn.Module):
         super(RecurrentDecoder, self).__init__()    
 
         self.n_layers = config.n_layers
-        self.embedding = nn.Embedding(config.emb_dim)
-        self.time_signal = generate_signal(512, config.hidden_dim).to(config.device)
-        self.pos_signal = generate_signal(config.n_layers, config.hidden_dim).to(config.device)
-        self.layer = nn.TransformerDecoderLayer(d_model=config.hidden_dim,
-                                                nhead=config.n_heads,
-                                                dim_feedforward=config.pff_dim,
-                                                dropout=config.dropout_ratio,
-                                                batch_first=True)
         self.norm = nn.LayerNorm(config.hidden_dim)
+        self.embedding = nn.Embedding(config.emb_dim)
+        
+        self.time_signal = generate_signal(
+            512, config.hidden_dim
+        ).to(config.device)
+        
+        self.pos_signal = generate_signal(
+            config.n_layers, config.hidden_dim
+        ).to(config.device)
+
+        self.layer = nn.TransformerDecoderLayer(
+            d_model=config.hidden_dim,
+            nhead=config.n_heads,
+            dim_feedforward=config.pff_dim,
+            dropout=config.dropout_ratio,
+            batch_first=True
+        )
+
 
 
     def forward(self, x, m, tgt_mask, tgt_key_padding_mask, memory_key_padding_mask):
@@ -76,10 +97,13 @@ class RecurrentDecoder(nn.Module):
         for l in range(self.n_layers):
             x += self.time_signal[:, :seq_len, :]
             x += self.pos_signal[:, l, :].unsqueeze(1).repeat(1, seq_len, 1)
-            x = self.layer(tgt=x, memory=m, 
-                           tgt_mask=tgt_mask, 
-                           tgt_key_padding_mask=tgt_key_padding_mask, 
-                           memory_key_padding_mask=memory_key_padding_mask)
+            x = self.layer(
+                tgt=x, memory=m, 
+                tgt_mask=tgt_mask, 
+                tgt_key_padding_mask=tgt_key_padding_mask, 
+                memory_key_padding_mask=memory_key_padding_mask
+            )
+
         return self.norm(x)
 
 
@@ -109,14 +133,21 @@ class RecurrentTransformer(nn.Module):
         trg_mask = generate_square_subsequent_mask(trg.size(1)).to(self.device)
 
         memory = self.encoder(src, src_key_padding_mask=src_pad_mask)
-        dec_out = self.decoder(trg, memory, tgt_mask=trg_mask, 
-                               tgt_key_padding_mask=trg_pad_mask, 
-                               memory_key_padding_mask=src_pad_mask)
+        
+        dec_out = self.decoder(
+            trg, memory, tgt_mask=trg_mask, 
+            tgt_key_padding_mask=trg_pad_mask, 
+            memory_key_padding_mask=src_pad_mask
+        )
+
         logit = self.generator(dec_out)
         
         self.out.logit = logit
-        self.out.loss = self.criterion(logit.contiguous().view(-1, self.vocab_size), 
-                                       label.contiguous().view(-1))
+        
+        self.out.loss = self.criterion(
+            logit.contiguous().view(-1, self.vocab_size), 
+            label.contiguous().view(-1)
+        )
         
         return self.out
 

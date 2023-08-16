@@ -8,7 +8,7 @@ from module import (
     load_model,
     Trainer,
     Tester,
-    Search
+    Generator
 )
 
 
@@ -36,7 +36,6 @@ class Config(object):
             for group in params.keys():
                 for key, val in params[group].items():
                     setattr(self, key, val)
-
 
         self.task = args.task
         self.mode = args.mode
@@ -77,34 +76,6 @@ def load_tokenizer(config):
 
 
 
-def inference(config, model, tokenizer):
-    search_module = Search(config, model)
-
-    print(f'--- Inference Process Started! ---')
-    print('[ Type "quit" on user input to stop the Process ]')
-    
-    while True:
-        input_seq = input('\nUser Input Sequence >> ').lower()
-
-        #Enc Condition
-        if input_seq == 'quit':
-            print('\n--- Inference Process has terminated! ---')
-            break        
-
-        input_seq = tokenizer.EncodeAsIds(input_seq)
-        input_seq = torch.LongTensor([input_seq])
-
-        if config.search_method == 'beam':
-            output_seq = search_module.beam_search(input_seq)
-        else:
-            output_seq = search_module.greedy_search(input_seq)
-
-        output_seq = tokenizer.decode(output_seq)
-
-        print(f"Model Out Sequence >> {output_seq}")       
-
-
-
 
 def main(args):
     set_seed()
@@ -125,7 +96,8 @@ def main(args):
         tester.test()
 
     elif config.mode == 'inference':
-        inference(config, model, tokenizer)
+        generator = Generator(config, model, tokenizer)
+        generator.inference()
 
 
 
