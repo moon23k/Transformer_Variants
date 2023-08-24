@@ -62,10 +62,11 @@ class Config(object):
 
 
 def load_tokenizer(config):
-    tokenizer_path = f"data/{config.task}/tokenizer.json"
-    assert os.path.exists(tokenizer_path)
-
-    tokenizer = Tokenizer.from_file(tokenizer_path)    
+    
+    assert os.path.exists(config.tokenizer_path)
+    
+    tokenizer = Tokenizer.from_file(config.tokenizer_path)    
+    
     tokenizer.post_processor = TemplateProcessing(
         single=f"{config.bos_token} $A {config.eos_token}",
         special_tokens=[(config.bos_token, config.bos_id), 

@@ -71,13 +71,13 @@ class Tester:
         if self.task == 'nmt':
             score = self.metric_module.compute(
                 predictions=pred, 
-                references =[label]
+                references =[[l] for l in label]
             )['bleu']
         #For Dialg & Sum Evaluation
         else:
             score = self.metric_module.compute(
                 predictions=pred, 
-                references =[label]
+                references =[[l] for l in label]
             )['rouge2']
 
         return score * 100

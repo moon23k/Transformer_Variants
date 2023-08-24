@@ -26,6 +26,7 @@ class Dataset(torch.utils.data.Dataset):
     def __getitem__(self, idx):
         src = self.tokenizer.encode(self.data[idx]['src']).ids
         trg = self.tokenizer.encode(self.data[idx]['trg']).ids
+        
         return torch.LongTensor(src), torch.LongTensor(trg)
 
 
