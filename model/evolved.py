@@ -2,8 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.init as init
 from torch.nn import functional as F
-from collections import namedtuple
-from model.common import *
+from .common import clones, Embeddings
 
 
 
@@ -95,9 +94,9 @@ class EncoderCell(nn.Module):
         )
 
 
-    def forward(self, src, src_key_padding_mask):
+    def forward(self, x, e_mask):
         ### Block_01
-        B01_out = self.glu(self.layer_norms[0](src)) #Dim:512
+        B01_out = self.glu(self.layer_norms[0](x)) #Dim:512
 
 
         ### Block_02
@@ -136,7 +135,7 @@ class EncoderCell(nn.Module):
         
         attention_out = self.attention(
             B04_out, B04_out, B04_out,
-            key_padding_mask = src_key_padding_mask,
+            key_padding_mask = e_mask,
             need_weights=False
         )[0]
         
@@ -204,22 +203,20 @@ class DecoderCell(nn.Module):
         )
 
 
-    def forward(self, trg, memory, tgt_mask, tgt_key_padding_mask, memory_key_padding_mask):
+    def forward(self, x, memory, e_mask, d_mask):
 
         ### Block_01
-        B01_out = self.layer_norms[0](trg)
+        B01_out = self.layer_norms[0](x)
 
         left_out = self.left_attn(
             B01_out, B01_out, B01_out,
-            key_padding_mask=tgt_key_padding_mask,
-            attn_mask=tgt_mask,
+            attn_mask=d_mask,
             need_weights=False
         )[0]
 
         right_out = self.right_attn(
             B01_out, B01_out, B01_out,
-            key_padding_mask=tgt_key_padding_mask,
-            attn_mask=tgt_mask,
+            attn_mask=d_mask,
             need_weights=False
         )[0]
 
@@ -250,8 +247,7 @@ class DecoderCell(nn.Module):
         
         B04_out = self.self_attn(
             B04_out, B04_out, B04_out,
-            key_padding_mask=tgt_key_padding_mask,
-            attn_mask=tgt_mask,
+            attn_mask=d_mask,
             need_weights=False
         )[0]
 
@@ -263,7 +259,7 @@ class DecoderCell(nn.Module):
         
         B05_out = self.src_attn(
             B05_out, memory, memory,
-            key_padding_mask=memory_key_padding_mask,
+            key_padding_mask=e_mask,
             need_weights=False
         )[0]
 
@@ -286,10 +282,10 @@ class EvolvedEncoder(nn.Module):
         self.cells = clones(EncoderCell(config), config.n_layers//2)
 
 
-    def forward(self, x, src_key_padding_mask):
+    def forward(self, x, e_mask):
         x = self.embeddings(x)
         for cell in self.cells:
-            x = cell(x, src_key_padding_mask=src_key_padding_mask)
+            x = cell(x, src_key_padding_mask=e_mask)
         return x
 
 
@@ -302,14 +298,10 @@ class EvolvedDecoder(nn.Module):
         self.cells = clones(DecoderCell(config), config.n_layers//2)
 
 
-    def forward(self, x, memory, tgt_mask, tgt_key_padding_mask, memory_key_padding_mask):
+    def forward(self, x, memory, e_mask, d_mask):
         x = self.embeddings(x)
         for cell in self.cells:
-            x = cell(
-                x, memory, tgt_mask=tgt_mask, 
-                tgt_key_padding_mask=tgt_key_padding_mask, 
-                memory_key_padding_mask=memory_key_padding_mask
-            )
+            x = cell(x, memory, e_mask, d_mask)
 
         return x
 
@@ -324,28 +316,24 @@ class EvolvedTransformer(nn.Module):
 
         self.encoder = EvolvedEncoder(config) 
         self.decoder = EvolvedDecoder(config)
-
         self.generator = nn.Linear(config.hidden_dim, config.vocab_size)
-        self.criterion = nn.CrossEntropyLoss()
-        
-        self.out = namedtuple('Out', 'logit loss')
 
 
-    def forward(self, src, trg):
-        trg, label = shift_trg(trg)
+    def pad_mask(self, x):
+        return x == self.pad_mask        
 
-        src_pad_mask = (src == self.pad_id)
-        trg_pad_mask = (trg == self.pad_id)
-        trg_mask = generate_square_subsequent_mask(trg.size(1)).to(self.device)
 
-        memory = self.encoder(src, src_pad_mask)
-        dec_out = self.decoder(trg, memory, trg_mask, trg_pad_mask, src_pad_mask)
-        logit = self.generator(dec_out)
-        
-        self.out.logit = logit
-        self.out.loss = self.criterion(
-            logit.contiguous().view(-1, self.vocab_size), 
-            label.contiguous().view(-1)
-        )
+    def dec_mask(self, x):
+        sz = x.size(1)
+        mask = None
+        return mask.to(self.device)
 
-        return self.out
+
+    def forward(self, x, y):
+        e_mask = self.pad_mask(x)
+        d_mask = self.dec_mask(y)
+
+        memory = self.encoder(x, e_mask)
+        dec_out = self.decoder(y, memory, e_mask, d_mask)
+
+        return self.generator(dec_out)

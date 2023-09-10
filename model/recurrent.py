@@ -1,8 +1,6 @@
 import numpy as np
 import torch, math
 import torch.nn as nn
-from collections import namedtuple
-from .common import shift_trg, generate_square_subsequent_mask
 
 
 
@@ -49,15 +47,14 @@ class RecurrentEncoder(nn.Module):
         )
         
 
-
-    def forward(self, x, src_key_padding_mask):
+    def forward(self, x, e_mask):
         x = self.embedding(x)
         seq_len = x.size(1)
 
         for l in range(self.n_layers):
             x += self.time_signal[:, :seq_len, :]
             x += self.pos_signal[:, l, :].unsqueeze(1).repeat(1, seq_len, 1)
-            x = self.layer(x, src_key_padding_mask=src_key_padding_mask)
+            x = self.layer(x, src_key_padding_mask=e_mask)
         
         return self.norm(x)
 
@@ -90,7 +87,7 @@ class RecurrentDecoder(nn.Module):
 
 
 
-    def forward(self, x, m, tgt_mask, tgt_key_padding_mask, memory_key_padding_mask):
+    def forward(self, x, m, e_mask, d_mask):
         x = self.embedding(x)
         seq_len = x.size(1)
 
@@ -98,10 +95,9 @@ class RecurrentDecoder(nn.Module):
             x += self.time_signal[:, :seq_len, :]
             x += self.pos_signal[:, l, :].unsqueeze(1).repeat(1, seq_len, 1)
             x = self.layer(
-                tgt=x, memory=m, 
-                tgt_mask=tgt_mask, 
-                tgt_key_padding_mask=tgt_key_padding_mask, 
-                memory_key_padding_mask=memory_key_padding_mask
+                tgt=x, memory=m,
+                memory_key_padding_mask=e_mask, 
+                tgt_mask=d_mask
             )
 
         return self.norm(x)
@@ -119,35 +115,23 @@ class RecurrentTransformer(nn.Module):
         
         self.encoder = RecurrentEncoder(config)
         self.decoder = RecurrentDecoder(config)
-
         self.generator = nn.Linear(config.hidden_dim, config.vocab_size)
-        self.criterion = nn.CrossEntropyLoss()
-        self.out = namedtuple('Out', 'logit loss')
+
+
+    def pad_mask(self, x):
+        return x == self.pad_mask
+
+
+    def dec_mask(self, x):
+        return
 
         
-    def forward(self, src, trg):
-        trg, label = shift_trg(trg)
+    def forward(self, x, y):
+        e_mask = self.pad_mask(x)
+        d_mask = self.dec_mask(y)
         
-        src_pad_mask = (src == self.pad_id)
-        trg_pad_mask = (trg == self.pad_id)
-        trg_mask = generate_square_subsequent_mask(trg.size(1)).to(self.device)
-
-        memory = self.encoder(src, src_key_padding_mask=src_pad_mask)
+        memory = self.encoder(x, e_mask)
+        dec_out = self.decoder(y, memory, e_mask, d_mask)
         
-        dec_out = self.decoder(
-            trg, memory, tgt_mask=trg_mask, 
-            tgt_key_padding_mask=trg_pad_mask, 
-            memory_key_padding_mask=src_pad_mask
-        )
-
-        logit = self.generator(dec_out)
-        
-        self.out.logit = logit
-        
-        self.out.loss = self.criterion(
-            logit.contiguous().view(-1, self.vocab_size), 
-            label.contiguous().view(-1)
-        )
-        
-        return self.out
+        return self.generator(dec_out)
 

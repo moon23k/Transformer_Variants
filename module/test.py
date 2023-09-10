@@ -1,4 +1,4 @@
-import torch, math, time, evaluate
+import torch, evaluate
 
 
 
@@ -27,8 +27,8 @@ class Tester:
 
         with torch.no_grad():
             for batch in self.dataloader:
-                x = batch['src'].to(self.device)
-                y = self.tokenize(batch['trg'])
+                x = batch['x'].to(self.device)
+                y = self.tokenize(batch['y'])
 
                 pred = self.predict(x)
                 pred = self.tokenize(pred)
@@ -52,12 +52,11 @@ class Tester:
         pred[:, 0] = self.bos_id
 
         e_mask = self.model.pad_mask(x)
-        memory = self.model.encode(x, e_mask)
+        memory = self.model.encoder(x, e_mask)
 
         for idx in range(1, self.max_len):
             y = pred[:, :idx]
-            d_mask = self.model.dec_mask(y)
-            d_out = self.model.decode(y, memory, e_mask, d_mask)
+            d_out = self.model.decoder(y, memory, e_mask, None)
 
             logit = self.model.generator(d_out)
             pred[:, idx] = logit.argmax(dim=-1)[:, -1]

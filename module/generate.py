@@ -20,6 +20,8 @@ class Generator:
         self.bos_id = config.bos_id
         self.eos_id = config.eos_id
         self.pad_id = config.pad_id
+
+        self.search_method = config.search_method
         
         self.Node = namedtuple(
             'Node', 
@@ -40,19 +42,19 @@ class Generator:
                 print('\n--- Inference Process has terminated! ---')
                 break        
 
-            output_seq = self.generate(input_seq, search=self.search)
+            output_seq = self.generate(input_seq)
             print(f"Model Out Sequence >> {output_seq}")       
             
 
 
-    def generate(self, input_tensor, search='greedy'):
-        if isinstance(input_tensor, str):
-            input_tensor = torch.LongTensor([[input_tensor]]).to(self.device)
+    def generate(self, input_seq):
+        input_tensor = self.tokenizer.encode(input_seq)
+        input_tensor = torch.LongTensor([input_tensor]).to(self.device)
 
         with torch.no_grad():
-            if search == 'greedy':
+            if self.search_method == 'greedy':
                 generated_ids = self.greedy_search(input_tensor)
-            elif search == 'beam':
+            elif self.search_method == 'beam':
                 generated_ids = self.beam_search(input_tensor)
         
         return self.tokenizer.decode(generated_ids)
