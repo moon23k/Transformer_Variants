@@ -1,5 +1,5 @@
-## Transformer Ablation
-<br>
+## Transformer Variants
+
 Transformer introduced a new approach to sequence processing through the Attention Mechanism, revolutionizing the traditional sequential data processing methods. Along with its success, many research studies based on Transformer has conducted. However, most of these studies focused on utilizing Transformer as it is and exploring additional advancements, resulting in a relatively limited number of studies comparing the performance of natural language processing based on the structural changes of the Transformer model itself. 
 
 To mend this situation, this repo focuses on structure of the Transformer and implements three Transformer models: **Standard Transformer**, **Recurrent Transformer**, and **Evolved Transformer**. The performance evaluation of each model is conducted in three natural language generation tasks: **Neural Machine Translation**, **Dialogue Generation**, and **Text Summarization**. 
@@ -8,7 +8,7 @@ To mend this situation, this repo focuses on structure of the Transformer and im
 
 
 ## Model Architectures
-<br><table>
+<table>
   <tr align='center'>
     <td><b>Standard Transformer</b></td>
     <td><b>Recurrent Transformer</b></td>
@@ -24,7 +24,6 @@ To mend this situation, this repo focuses on structure of the Transformer and im
 
 
 ## Experimental Setups
-<br>
 
 | &emsp; **Data Setup**                      | &emsp; **Model Setup**                | &emsp; **Training Setup** |
 | :---                                       | :---                                  | :---                      |
@@ -43,24 +42,32 @@ To mend this situation, this repo focuses on structure of the Transformer and im
 <br><br>
 
 ## Result
-<p align='center'>
-  <img src="https://github.com/moon23k/Transformer_Archs/assets/71929682/b0d2e7e5-422c-401e-b924-850b7b0b5811" width='80%' height='80%' />
-</p>
+| Model | Translation | Dialogue Generation | Summarization |
+|:---:|:---:|:---:|:---:|
+| Standard Transformer | - | - | - |
+| Recurrent Transformer | - | - | - |
+| Evolved Transformer | - | - | - |
+
 <br><br>
 
 
 ## How to Use
-
+**Clone git repo in your env** 
 ```
 git clone https://github.com/moon23k/Transformer_Arhcs.git
 ```
 
+<br> **Setup Datasets and Tokenizer via setup.py file**
 ```
-python3 setup.py
+python3 setup.py -task ['all', 'translation', 'dialogue', 'summarization']
 ```
 
+<br> **Actual tasks are done by running run.py file**
 ```
-python3 run.py -mode ['train', 'test', 'inference'] -model ['standard', 'recurrent', 'evolved']
+python3 run.py -task ['translation', 'dialogue', 'summarization']
+               -mode ['train', 'test', 'inference']
+               -model ['standard', 'recurrent', 'evolved']
+               -search ['greedy', 'beam']
 ```
 <br><br>
 
