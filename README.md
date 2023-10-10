@@ -8,36 +8,24 @@ To mend this situation, this repo focuses on structure of the Transformer and im
 
 
 ## Model Architectures
-<table>
-  <tr align='center'>
-    <td><b>Standard Transformer</b></td>
-    <td><b>Recurrent Transformer</b></td>
-    <td><b>Evolved Transformer</b></td>
-  </tr>
-  <tr>
-    <td><img src="https://github.com/moon23k/Transformer_Archs/assets/71929682/5d118ff7-7d8d-4093-ba73-e131e703f467" height=90%; /></td>
-    <td><img src="https://github.com/moon23k/Transformer_Archs/assets/71929682/a3a4de91-ecef-4841-a005-c1810ec850ef" /></td>
-    <td><img src="https://github.com/moon23k/Transformer_Archs/assets/71929682/1ce4619d-fa7c-44d2-8498-ec568c27994e" /></td>
-  </tr>  
-</table>
-<br><br>
 
+| Standard Transformer | Recurrent Transformer | Evolved Transformer |
+|--------------|-------------|-------------|
+| <div align="center"><img src="https://github.com/moon23k/Transformer_Archs/assets/71929682/5d118ff7-7d8d-4093-ba73-e131e703f467" height=300px; /></div> | <div align="center"><img src="https://github.com/moon23k/Transformer_Archs/assets/71929682/a3a4de91-ecef-4841-a005-c1810ec850ef" height=300px%; /></div> | <div align="center"><img src="https://github.com/moon23k/Transformer_Archs/assets/71929682/1ce4619d-fa7c-44d2-8498-ec568c27994e" /></div> |
+| The most basic Transformer Model Architecture introduced in the **Attention Is All You Need** paper | The recursive layer-connected Transformer model structure introduced in the **Universal Transformers** paper | The advanced Transformer model structure introduced in the **The Evolved Transformer** |
+
+<br><br> 
 
 ## Experimental Setups
 
-| &emsp; **Data Setup**                      | &emsp; **Model Setup**                | &emsp; **Training Setup** |
-| :---                                       | :---                                  | :---                      |
-| **`Machine Translation:`** &hairsp; `WMT14 En-De` | **`Embedding Dimension:`** `256` | **`Epochs:`** `10` |
-| **`Dialogue Generation:`** &hairsp; `Daily Dialogue` | **`Hidden Dimension:`** `256`  | **`Batch Size:`** `32` |
-| **`Text Summarization:`** &hairsp; `Daily Mail` | **`PFF Dimension:`** `512` | **`Learning Rate:`** `5e-4` |
-| **`Train Data Volumn:`** &hairsp; `30,000` | **`N Heads:`** `512` | **`iters_to_accumulate:`** `4`           |
-| **`Valid Data Volumn:`** &hairsp; `1,000` | **`N Layers:`** `6` | **`Gradient Clip Max Norm:`** `1` |
-| **`Vocab Size:`** `30,000`        | **`N Cells:`** `3`             | **`Apply AMP:`** `True`       |
-
-<br>To shorten the training speed, three techiques are used. <br> 
-* **Pre Tokenization** <br>
-* **Accumulative Loss Update**, as shown in the table above, accumulative frequency has set 4. <br>
-* **Application of AMP**, which enables to convert float32 type vector into float16 type vector.
+| &emsp; **Data Setup**                                | &emsp; **Model Setup**                | &emsp; **Training Setup** |
+| :---                                                 | :---                                  | :---                      |
+| **`Machine Translation:`** &hairsp; `WMT14 En-De`    | **`Embedding Dimension:`** `256` | **`Epochs:`** `10` |
+| **`Dialogue Generation:`** &hairsp; `Daily Dialogue` | **`Hidden Dimension:`** `256`    | **`Batch Size:`** `32` |
+| **`Text Summarization:`** &hairsp; `Daily Mail`      | **`PFF Dimension:`** `512`       | **`Learning Rate:`** `5e-4` |
+| **`Train Data Volumn:`** &hairsp; `100,000`          | **`N Heads:`** `512`             | **`iters_to_accumulate:`** `4` |
+| **`Valid Data Volumn:`** &hairsp; `1,000`            | **`N Layers:`** `6`              | **`Gradient Clip Max Norm:`** `1` |
+| **`Vocab Size:`** `15,000`                           | **`N Cells:`** `3`               | **`Apply AMP:`** `True` |
 
 <br><br>
 
