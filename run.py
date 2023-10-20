@@ -110,7 +110,7 @@ if __name__ == '__main__':
     parser.add_argument('-model', required=True)
     
     args = parser.parse_args()
-    assert args.task in ['nmt', 'dialog', 'sum']
+    assert args.task in ['translation', 'dialogue', 'summarization']
     assert args.mode in ['train', 'test', 'inference']
     assert args.model in ['standard', 'recurrent', 'evolved']
     

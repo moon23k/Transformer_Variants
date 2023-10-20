@@ -1,5 +1,5 @@
 vocab:
-    vocab_size: 5000
+    vocab_size: 10000
     pad_id: 0
     unk_id: 1
     bos_id: 2
@@ -22,7 +22,7 @@ model:
 
 train:
     n_epochs: 10
-    batch_size: 128
+    batch_size: 32
     lr: 0.0005
     early_stop: 1
     patience: 3
