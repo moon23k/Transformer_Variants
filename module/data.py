@@ -58,7 +58,7 @@ class Collator(object):
 def load_dataloader(config, tokenizer, split):
     return DataLoader(
         Dataset(tokenizer, config.task, split), 
-        batch_size=batch_size, 
+        batch_size=config.batch_size, 
         shuffle=split=='train',
         collate_fn=Collator(config.pad_id),
         pin_memory=True,

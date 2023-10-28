@@ -23,7 +23,7 @@ class Trainer:
         self.valid_dataloader = valid_dataloader
 
         self.optimizer = AdamW(self.model.parameters(), lr=config.lr)
-        self.lr_scheduler = ReduceLROnPlateau(self.optimizer, 'min')
+        self.lr_scheduler = ReduceLROnPlateau(self.optimizer, patience=2)
         self.criterion = nn.CrossEntropyLoss()
         
         self.early_stop = config.early_stop
