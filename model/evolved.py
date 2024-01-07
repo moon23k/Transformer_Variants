@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.init as init
 from torch.nn import functional as F
 from .common import clones, Embeddings
-
+from collections import namedtuple
 
 
 
@@ -285,7 +285,7 @@ class EvolvedEncoder(nn.Module):
     def forward(self, x, e_mask):
         x = self.embeddings(x)
         for cell in self.cells:
-            x = cell(x, src_key_padding_mask=e_mask)
+            x = cell(x, e_mask)
         return x
 
 
@@ -318,22 +318,39 @@ class EvolvedTransformer(nn.Module):
         self.decoder = EvolvedDecoder(config)
         self.generator = nn.Linear(config.hidden_dim, config.vocab_size)
 
+        self.criterion = nn.CrossEntropyLoss()
+        self.out = namedtuple('Out', 'logit loss')
+
+
+    @staticmethod    
+    def shift_y(x):
+        return x[:, :-1], x[:, 1:]    
+
 
     def pad_mask(self, x):
-        return x == self.pad_mask        
-
+        return x == self.pad_id
 
     def dec_mask(self, x):
         sz = x.size(1)
-        mask = None
-        return mask.to(self.device)
+        return torch.triu(torch.full((sz, sz), float('-inf')), diagonal=1).to(self.device)
 
 
     def forward(self, x, y):
+        y, label = self.shift_y(y)
+
         e_mask = self.pad_mask(x)
         d_mask = self.dec_mask(y)
 
         memory = self.encoder(x, e_mask)
         dec_out = self.decoder(y, memory, e_mask, d_mask)
 
-        return self.generator(dec_out)
+        logit = self.generator(dec_out)
+        
+        #Getting Outputs
+        self.out.logit = logit
+        self.out.loss = self.criterion(
+            logit.contiguous().view(-1, self.vocab_size), 
+            label.contiguous().view(-1)
+        )
+
+        return self.out

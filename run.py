@@ -42,7 +42,7 @@ class Config(object):
         self.model_type = args.model
         self.search_method = args.search
 
-        self.ckpt = f"ckpt/{self.task}/{self.model_type}.pt"
+        self.ckpt = f"ckpt/{self.task}/{self.model_type}_model.pt"
         self.tokenizer_path = f'data/{self.task}/tokenizer.json'
 
         if self.task == 'sum':
@@ -62,9 +62,7 @@ class Config(object):
 
 
 def load_tokenizer(config):
-    
     assert os.path.exists(config.tokenizer_path)
-    
     tokenizer = Tokenizer.from_file(config.tokenizer_path)    
     
     tokenizer.post_processor = TemplateProcessing(
@@ -108,11 +106,13 @@ if __name__ == '__main__':
     parser.add_argument('-task', required=True)
     parser.add_argument('-mode', required=True)
     parser.add_argument('-model', required=True)
+    parser.add_argument('-search', default='greedy', required=False)
     
     args = parser.parse_args()
     assert args.task in ['translation', 'dialogue', 'summarization']
     assert args.mode in ['train', 'test', 'inference']
     assert args.model in ['standard', 'recurrent', 'evolved']
+    assert args.search in ['greedy', 'beam']
     
     if args.mode == 'train':
         os.makedirs(f"ckpt/{args.task}", exist_ok=True)

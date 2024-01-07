@@ -1,7 +1,8 @@
 import numpy as np
 import torch, math
 import torch.nn as nn
-
+from .common import Embeddings
+from collections import namedtuple
 
 
 
@@ -27,10 +28,11 @@ class RecurrentEncoder(nn.Module):
 
         self.n_layers = config.n_layers
         self.norm = nn.LayerNorm(config.hidden_dim)
-        self.embedding = nn.Embedding(config.emb_dim)
+        self.embeddings = Embeddings(config)
         
+        max_len = config.max_len if config.task != 'summarization' else config.max_len * 4
         self.time_signal = generate_signal(
-            512, config.hidden_dim
+            max_len, config.hidden_dim
         ).to(config.device)
 
         self.pos_signal = generate_signal(
@@ -48,7 +50,7 @@ class RecurrentEncoder(nn.Module):
         
 
     def forward(self, x, e_mask):
-        x = self.embedding(x)
+        x = self.embeddings(x)
         seq_len = x.size(1)
 
         for l in range(self.n_layers):
@@ -67,7 +69,7 @@ class RecurrentDecoder(nn.Module):
 
         self.n_layers = config.n_layers
         self.norm = nn.LayerNorm(config.hidden_dim)
-        self.embedding = nn.Embedding(config.emb_dim)
+        self.embeddings = Embeddings(config)
         
         self.time_signal = generate_signal(
             512, config.hidden_dim
@@ -88,7 +90,7 @@ class RecurrentDecoder(nn.Module):
 
 
     def forward(self, x, m, e_mask, d_mask):
-        x = self.embedding(x)
+        x = self.embeddings(x)
         seq_len = x.size(1)
 
         for l in range(self.n_layers):
@@ -117,21 +119,40 @@ class RecurrentTransformer(nn.Module):
         self.decoder = RecurrentDecoder(config)
         self.generator = nn.Linear(config.hidden_dim, config.vocab_size)
 
+        self.criterion = nn.CrossEntropyLoss()
+        self.out = namedtuple('Out', 'logit loss')
+
+
+    @staticmethod    
+    def shift_y(x):
+        return x[:, :-1], x[:, 1:]    
+
 
     def pad_mask(self, x):
-        return x == self.pad_mask
-
+        return x == self.pad_id
 
     def dec_mask(self, x):
-        return
+        sz = x.size(1)
+        return torch.triu(torch.full((sz, sz), float('-inf')), diagonal=1).to(self.device)
 
         
     def forward(self, x, y):
+        y, label = self.shift_y(y)
+
         e_mask = self.pad_mask(x)
         d_mask = self.dec_mask(y)
         
         memory = self.encoder(x, e_mask)
         dec_out = self.decoder(y, memory, e_mask, d_mask)
+
+        logit = self.generator(dec_out)
         
-        return self.generator(dec_out)
+        #Getting Outputs
+        self.out.logit = logit
+        self.out.loss = self.criterion(
+            logit.contiguous().view(-1, self.vocab_size), 
+            label.contiguous().view(-1)
+        )
+
+        return self.out
 
