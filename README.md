@@ -42,7 +42,7 @@ To mend this situation, this repo focuses on structure of the Transformer and im
 ## How to Use
 **Clone git repo in your env** 
 ```
-git clone https://github.com/moon23k/Transformer_Arhcs.git
+git clone https://github.com/moon23k/Transformer_Variants.git
 ```
 
 <br> **Setup Datasets and Tokenizer via setup.py file**
