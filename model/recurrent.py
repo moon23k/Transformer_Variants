@@ -6,6 +6,7 @@ from collections import namedtuple
 
 
 
+
 def generate_signal(length, channels, min_timescale=1.0, max_timescale=1.0e4):
     position = np.arange(length)
     num_timescales = channels // 2
@@ -31,6 +32,7 @@ class RecurrentEncoder(nn.Module):
         self.embeddings = Embeddings(config)
         
         max_len = config.max_len if config.task != 'summarization' else config.max_len * 4
+        
         self.time_signal = generate_signal(
             max_len, config.hidden_dim
         ).to(config.device)
@@ -45,7 +47,8 @@ class RecurrentEncoder(nn.Module):
             nhead=config.n_heads,
             dim_feedforward=config.pff_dim,
             dropout=config.dropout_ratio,
-            batch_first=True
+            batch_first=True,
+            norm_first=True
         )
         
 
@@ -65,7 +68,7 @@ class RecurrentEncoder(nn.Module):
 
 class RecurrentDecoder(nn.Module):
     def __init__(self, config):
-        super(RecurrentDecoder, self).__init__()    
+        super(RecurrentDecoder, self).__init__()
 
         self.n_layers = config.n_layers
         self.norm = nn.LayerNorm(config.hidden_dim)
@@ -84,7 +87,8 @@ class RecurrentDecoder(nn.Module):
             nhead=config.n_heads,
             dim_feedforward=config.pff_dim,
             dropout=config.dropout_ratio,
-            batch_first=True
+            batch_first=True,
+            norm_first=True
         )
 
 
@@ -131,6 +135,7 @@ class RecurrentTransformer(nn.Module):
     def pad_mask(self, x):
         return x == self.pad_id
 
+
     def dec_mask(self, x):
         sz = x.size(1)
         return torch.triu(torch.full((sz, sz), float('-inf')), diagonal=1).to(self.device)
@@ -155,4 +160,3 @@ class RecurrentTransformer(nn.Module):
         )
 
         return self.out
-

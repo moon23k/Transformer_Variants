@@ -1,7 +1,8 @@
 import math, torch
 import torch.nn as nn
-from .common import clones, Embeddings
 from collections import namedtuple
+from .common import clones, Embeddings
+
 
 
 
@@ -15,7 +16,8 @@ class StandardEncoder(nn.Module):
             dim_feedforward=config.pff_dim,
             dropout=config.dropout_ratio,
             activation='gelu',
-            batch_first=True
+            batch_first=True,
+            norm_first=True
         )
 
         self.embeddings = Embeddings(config)
@@ -40,7 +42,8 @@ class StandardDecoder(nn.Module):
             dim_feedforward=config.pff_dim,
             dropout=config.dropout_ratio,
             activation='gelu',
-            batch_first=True
+            batch_first=True,
+            norm_first=True
         )
 
         self.embeddings = Embeddings(config)
@@ -72,16 +75,18 @@ class StandardTransformer(nn.Module):
         self.encoder = StandardEncoder(config)
         self.decoder = StandardDecoder(config)
         self.generator = nn.Linear(config.hidden_dim, config.vocab_size)
+
         self.criterion = nn.CrossEntropyLoss()
         self.out = namedtuple('Out', 'logit loss')        
-
-    def pad_mask(self, x):
-        return x == self.pad_id
 
 
     @staticmethod    
     def shift_y(x):
         return x[:, :-1], x[:, 1:]    
+
+
+    def pad_mask(self, x):
+        return x == self.pad_id
 
 
     def dec_mask(self, x):

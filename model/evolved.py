@@ -7,6 +7,7 @@ from collections import namedtuple
 
 
 
+
 #GLU
 class GatedConvolution(nn.Module):
     def __init__(self, hidden_dim, kernel_size=3, padding=1):
@@ -26,6 +27,7 @@ class GatedConvolution(nn.Module):
         out, gate = convoluted.split(int(convoluted.size(-1) / 2), -1)
         out = out * torch.sigmoid(gate)
         return out
+
 
 
 
@@ -67,7 +69,7 @@ class EncoderCell(nn.Module):
         )
 
         self.mid_layer_norm = nn.LayerNorm(config.pff_dim)
-        self.layer_norms = nn.ModuleList([nn.LayerNorm(config.hidden_dim) for _ in range(4)])
+        self.layer_norms = clones(nn.LayerNorm(config.hidden_dim), 4)
 
         self.left_net = nn.Sequential(
             nn.Linear(config.hidden_dim, config.pff_dim),
@@ -149,6 +151,7 @@ class EncoderCell(nn.Module):
 
 
 
+
 class DecoderCell(nn.Module):
     def __init__(self, config):
         super(DecoderCell, self).__init__()
@@ -162,9 +165,7 @@ class DecoderCell(nn.Module):
 
         self.mid_layer_norm = nn.LayerNorm(config.hidden_dim * 2)
         
-        self.layer_norms = nn.ModuleList(
-            [nn.LayerNorm(config.hidden_dim) for _ in range(5)]
-        )        
+        self.layer_norms = clones(nn.LayerNorm(config.hidden_dim), 5)
 
         self.left_attn = nn.MultiheadAttention(
             config.hidden_dim, config.n_heads * 2, batch_first=True
@@ -201,6 +202,7 @@ class DecoderCell(nn.Module):
             nn.ReLU(),
             nn.Linear(config.pff_dim, config.hidden_dim)
         )
+
 
 
     def forward(self, x, memory, e_mask, d_mask):
@@ -274,6 +276,7 @@ class DecoderCell(nn.Module):
 
 
 
+
 class EvolvedEncoder(nn.Module):
     def __init__(self, config):
         super(EvolvedEncoder, self).__init__()
@@ -287,6 +290,7 @@ class EvolvedEncoder(nn.Module):
         for cell in self.cells:
             x = cell(x, e_mask)
         return x
+
 
 
 
@@ -304,6 +308,8 @@ class EvolvedDecoder(nn.Module):
             x = cell(x, memory, e_mask, d_mask)
 
         return x
+
+
 
 
 class EvolvedTransformer(nn.Module):
@@ -354,3 +360,4 @@ class EvolvedTransformer(nn.Module):
         )
 
         return self.out
+        
