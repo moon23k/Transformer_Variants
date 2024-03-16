@@ -1,8 +1,10 @@
 import numpy as np
 import torch, math
 import torch.nn as nn
-from .common import Embeddings
 from collections import namedtuple
+from .common import Embeddings
+from .standard import StandardDecoder
+
 
 
 
@@ -120,7 +122,12 @@ class RecurrentTransformer(nn.Module):
         self.vocab_size = config.vocab_size
         
         self.encoder = RecurrentEncoder(config)
-        self.decoder = RecurrentDecoder(config)
+        
+        if config.model_type == 'recurrent':
+            self.decoder = RecurrentDecoder(config)
+        elif config.model_type == 'recurrent_hybrid':
+            self.decoder = StandardDecoder(config)
+
         self.generator = nn.Linear(config.hidden_dim, config.vocab_size)
 
         self.criterion = nn.CrossEntropyLoss()

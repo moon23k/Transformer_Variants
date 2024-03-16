@@ -2,8 +2,9 @@ import torch
 import torch.nn as nn
 import torch.nn.init as init
 from torch.nn import functional as F
-from .common import clones, Embeddings
 from collections import namedtuple
+from .common import clones, Embeddings
+from .standard import StandardDecoder
 
 
 
@@ -320,8 +321,13 @@ class EvolvedTransformer(nn.Module):
         self.device = config.device
         self.vocab_size = config.vocab_size
 
-        self.encoder = EvolvedEncoder(config) 
-        self.decoder = EvolvedDecoder(config)
+        self.encoder = EvolvedEncoder(config)
+
+        if config.model_type == 'evolved':
+            self.decoder = EvolvedDecoder(config)
+        elif config.model_type == 'evolved_hybrid':
+            self.decoder = StandardDecoder(config)
+
         self.generator = nn.Linear(config.hidden_dim, config.vocab_size)
 
         self.criterion = nn.CrossEntropyLoss()
@@ -360,4 +366,3 @@ class EvolvedTransformer(nn.Module):
         )
 
         return self.out
-        

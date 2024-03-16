@@ -39,9 +39,9 @@ def print_model_desc(model):
 def load_model(config):
     if config.model_type == 'standard':
         model = StandardTransformer(config)
-    elif config.model_type == 'recurrent':
+    elif config.model_type in ['recurrent', 'recurrent_hybrid']:
         model = RecurrentTransformer(config)
-    elif config.model_type == 'evolved':
+    elif config.model_type in ['evolved', 'evolved_hybrid']:
         model = EvolvedTransformer(config)
 
     init_weights(model)
