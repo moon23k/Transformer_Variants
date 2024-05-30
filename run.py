@@ -45,13 +45,9 @@ class Config(object):
         self.ckpt = f"ckpt/{self.task}/{self.model_type}_model.pt"
         self.tokenizer_path = f'data/{self.task}/tokenizer.json'
 
-        if self.task == 'sum':
-            self.batch_size = self.batch_size // 4
-
         use_cuda = torch.cuda.is_available()
-        self.device_type = 'cuda' \
-                           if use_cuda and self.mode != 'inference' \
-                           else 'cpu'
+        device_condition = use_cuda and self.mode != 'inference'
+        self.device_type = 'cuda' if device_condition else 'cpu'
         self.device = torch.device(self.device_type)
 
 
@@ -109,10 +105,10 @@ if __name__ == '__main__':
     parser.add_argument('-search', default='greedy', required=False)
     
     args = parser.parse_args()
-    assert args.task in ['translation', 'dialogue', 'summarization']
-    assert args.mode in ['train', 'test', 'inference']
-    assert args.model in ['standard', 'recurrent', 'evolved', 'recurrent_hybrid', 'evolved_hybrid']
-    assert args.search in ['greedy', 'beam']
+    assert args.task.lower() in ['translation', 'dialogue', 'summarization']
+    assert args.mode.lower() in ['train', 'test', 'inference']
+    assert args.model.lower() in ['standard', 'recurrent', 'evolved', 'recurrent_hybrid', 'evolved_hybrid']
+    assert args.search.lower() in ['greedy', 'beam']
     
     if args.mode == 'train':
         os.makedirs(f"ckpt/{args.task}", exist_ok=True)

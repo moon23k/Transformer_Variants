@@ -166,18 +166,18 @@ def train_tokenizer(task):
     
     assert os.path.exists('config.yaml')
     with open('config.yaml', 'r') as f:
-        vocab_config = yaml.load(f, Loader=yaml.FullLoader)['vocab']
+        tok_config = yaml.load(f, Loader=yaml.FullLoader)['tokenizer']
 
-    tokenizer = Tokenizer(BPE(unk_token=vocab_config['unk_token']))
+    tokenizer = Tokenizer(BPE(unk_token=tok_config['unk_token']))
     tokenizer.normalizer = normalizers.Sequence([NFD(), Lowercase(), StripAccents()])
     tokenizer.pre_tokenizer = Whitespace()
     trainer = BpeTrainer(
-        vocab_size=vocab_config['vocab_size'], 
+        vocab_size=tok_config['vocab_size'], 
         special_tokens=[
-            vocab_config['pad_token'], 
-            vocab_config['unk_token'],
-            vocab_config['bos_token'],
-            vocab_config['eos_token']
+            tok_config['pad_token'], 
+            tok_config['unk_token'],
+            tok_config['bos_token'],
+            tok_config['eos_token']
             ]
         )
 

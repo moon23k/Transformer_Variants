@@ -1,5 +1,5 @@
-vocab:
-    vocab_size: 15000
+tokenizer:
+    vocab_size: 30000
     pad_id: 0
     unk_id: 1
     bos_id: 2
