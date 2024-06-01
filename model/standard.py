@@ -1,6 +1,5 @@
 import math, torch
 import torch.nn as nn
-from collections import namedtuple
 from .components import clones, Embeddings, ModelBase
 
 

@@ -1,7 +1,6 @@
 import numpy as np
 import torch, math
 import torch.nn as nn
-from collections import namedtuple
 from .components import Embeddings, ModelBase
 from .standard import StandardDecoder
 
@@ -13,7 +12,7 @@ def generate_signal(length, channels, min_timescale=1.0, max_timescale=1.0e4):
     position = np.arange(length)
     num_timescales = channels // 2
     log_timescale_increment = ( math.log(float(max_timescale) / float(min_timescale)) / (float(num_timescales) - 1))
-    inv_timescales = min_timescale * np.exp(np.arange(num_timescales).astype(np.float) * -log_timescale_increment)
+    inv_timescales = min_timescale * np.exp(np.arange(num_timescales).astype(np.float32) * -log_timescale_increment)
     scaled_time = np.expand_dims(position, 1) * np.expand_dims(inv_timescales, 0)
 
     signal = np.concatenate([np.sin(scaled_time), np.cos(scaled_time)], axis=1)
@@ -113,9 +112,9 @@ class RecurrentDecoder(nn.Module):
 
 
 
-class RecurrentTransformer(nn.Module):
+class RecurrentTransformer(ModelBase):
     def __init__(self, config):
-        super(RecurrentTransformer, self).__init__()
+        super(RecurrentTransformer, self).__init__(config)
         
         self.encoder = RecurrentEncoder(config)
         self.decoder = StandardDecoder(config) if 'hybrid' in config.model_type else RecurrentDecoder(config)

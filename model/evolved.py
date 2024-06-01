@@ -2,7 +2,6 @@ import torch
 import torch.nn as nn
 import torch.nn.init as init
 from torch.nn import functional as F
-from collections import namedtuple
 from .components import clones, Embeddings, ModelBase
 from .standard import StandardDecoder
 
@@ -313,9 +312,9 @@ class EvolvedDecoder(nn.Module):
 
 
 
-class EvolvedTransformer(nn.Module):
+class EvolvedTransformer(ModelBase):
     def __init__(self, config):
-        super(EvolvedTransformer, self).__init__()
+        super(EvolvedTransformer, self).__init__(config)
         
         self.encoder = EvolvedEncoder(config)
         self.decoder = StandardDecoder(config) if 'hybrid' in config.model_type else EvolvedDecoder(config)
