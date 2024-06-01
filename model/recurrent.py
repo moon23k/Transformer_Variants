@@ -2,7 +2,7 @@ import numpy as np
 import torch, math
 import torch.nn as nn
 from collections import namedtuple
-from .common import Embeddings
+from .components import Embeddings, ModelBase
 from .standard import StandardDecoder
 
 
@@ -117,42 +117,14 @@ class RecurrentTransformer(nn.Module):
     def __init__(self, config):
         super(RecurrentTransformer, self).__init__()
         
-        self.pad_id = config.pad_id
-        self.device = config.device
-        self.vocab_size = config.vocab_size
-        
         self.encoder = RecurrentEncoder(config)
-        
-        if config.model_type == 'recurrent':
-            self.decoder = RecurrentDecoder(config)
-        elif config.model_type == 'recurrent_hybrid':
-            self.decoder = StandardDecoder(config)
+        self.decoder = StandardDecoder(config) if 'hybrid' in config.model_type else RecurrentDecoder(config)
 
-        self.generator = nn.Linear(config.hidden_dim, config.vocab_size)
-
-        self.criterion = nn.CrossEntropyLoss()
-        self.out = namedtuple('Out', 'logit loss')
-
-
-    @staticmethod    
-    def shift_y(x):
-        return x[:, :-1], x[:, 1:]    
-
-
-    def pad_mask(self, x):
-        return x == self.pad_id
-
-
-    def dec_mask(self, x):
-        sz = x.size(1)
-        return torch.triu(torch.full((sz, sz), float('-inf')), diagonal=1).to(self.device)
 
         
     def forward(self, x, y):
         y, label = self.shift_y(y)
-
-        e_mask = self.pad_mask(x)
-        d_mask = self.dec_mask(y)
+        e_mask, d_mask = self.pad_mask(x), self.causal_mask(y) 
         
         memory = self.encoder(x, e_mask)
         dec_out = self.decoder(y, memory, e_mask, d_mask)

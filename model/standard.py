@@ -1,7 +1,7 @@
 import math, torch
 import torch.nn as nn
 from collections import namedtuple
-from .common import clones, Embeddings
+from .components import clones, Embeddings, ModelBase
 
 
 
@@ -64,47 +64,25 @@ class StandardDecoder(nn.Module):
 
 
 
-class StandardTransformer(nn.Module):
+
+class StandardTransformer(ModelBase):
     def __init__(self, config):
-        super(StandardTransformer, self).__init__()
-        
-        self.pad_id = config.pad_id
-        self.device = config.device
-        self.vocab_size = config.vocab_size
+        super(StandardTransformer, self).__init__(config)        
         
         self.encoder = StandardEncoder(config)
         self.decoder = StandardDecoder(config)
-        self.generator = nn.Linear(config.hidden_dim, config.vocab_size)
-
-        self.criterion = nn.CrossEntropyLoss()
-        self.out = namedtuple('Out', 'logit loss')        
 
 
-    @staticmethod    
-    def shift_y(x):
-        return x[:, :-1], x[:, 1:]    
-
-
-    def pad_mask(self, x):
-        return x == self.pad_id
-
-
-    def dec_mask(self, x):
-        sz = x.size(1)
-        return torch.triu(torch.full((sz, sz), float('-inf')), diagonal=1).to(self.device)
-
-
-    def forward(self, x, y):
+    def forward(self, x, y):        
         y, label = self.shift_y(y)
-
-        #Masking
-        e_mask = self.pad_mask(x)
-        d_mask = self.dec_mask(y)
+        e_mask, d_mask = self.pad_mask(x), self.causal_mask(y)
         
+
         #Actual Processing
         memory = self.encoder(x, e_mask)
         dec_out = self.decoder(y, memory, e_mask, d_mask)
         logit = self.generator(dec_out)
+        
         
         #Getting Outputs
         self.out.logit = logit
@@ -112,5 +90,6 @@ class StandardTransformer(nn.Module):
             logit.contiguous().view(-1, self.vocab_size), 
             label.contiguous().view(-1)
         )
+
         
         return self.out

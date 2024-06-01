@@ -8,7 +8,7 @@ from module import (
     load_model,
     Trainer,
     Tester,
-    Generator
+    SeqGenerator
 )
 
 
@@ -91,7 +91,7 @@ def main(args):
         tester.test()
 
     elif config.mode == 'inference':
-        generator = Generator(config, model, tokenizer)
+        generator = SeqGenerator(config, model, tokenizer)
         generator.inference()
 
 

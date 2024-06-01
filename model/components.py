@@ -4,8 +4,10 @@ import torch.nn as nn
 
 
 
+
 def clones(module, N):
     return nn.ModuleList([copy.deepcopy(module) for _ in range(N)])
+
 
 
 
@@ -56,3 +58,35 @@ class Embeddings(nn.Module):
             return self.dropout(self.fc(out))
         return self.dropout(out)
 
+
+
+
+class ModelBase(nn.Module):
+    def __init__(self, config):
+        super(ModelBase, self).__init__()
+
+        #Attr Setup
+        self.pad_id = config.pad_id
+        self.device = config.device
+        self.vocab_size = config.vocab_size
+        
+        #Module Setup
+        self.generator = nn.Linear(config.hidden_dim, config.vocab_size)
+
+        #Output Setup
+        self.criterion = nn.CrossEntropyLoss()
+        self.out = namedtuple('Out', 'logit loss')
+
+
+    @staticmethod    
+    def shift_y(x):
+        return x[:, :-1], x[:, 1:]    
+
+
+    def pad_mask(self, x):
+        return x == self.pad_id
+
+
+    def causal_mask(self, x):
+        sz = x.size(1)
+        return torch.triu(torch.full((sz, sz), float('-inf')), diagonal=1).to(self.device)        

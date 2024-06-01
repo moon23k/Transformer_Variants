@@ -6,9 +6,9 @@ from collections import namedtuple
 
 
 
-class Generator:
+class SeqGenerator:
     def __init__(self, config, model, tokenizer):
-        super(Generator, self).__init__()
+        super(SeqGenerator, self).__init__()
         
         self.model = model
         self.device = model.device
